@@ -1,8 +1,7 @@
 import numpy as np
 
 from ArcProblem import ArcProblem
-from ArcData import ArcData
-from ArcSet import ArcSet
+from ArcDSL import solve_milestone_B_dumb
 
 
 class ArcAgent:
@@ -32,15 +31,11 @@ class ArcAgent:
 
         predictions: list[np.ndarray] = list()
 
-        '''
-        The next 2 lines are only an example of how to populate the predictions list.
-        This will just be an empty answer the size of the input data;
-        delete it before you start adding your own predictions.
-        '''
-        output = arc_problem.test_set().get_input_data().data()
-        output_rot90 = np.rot90(output)
-        output_rot180 = np.rot90(output_rot90)
-        output_rot270 = np.rot90(output_rot180)
-        predictions.extend([output_rot270, output_rot90, output_rot180])
+        output = solve_milestone_B_dumb(
+            arc_problem.training_set(),
+            arc_problem.test_set().get_input_data().data(),
+        )
+        if output is not None:
+            predictions.append(output)
 
         return predictions
