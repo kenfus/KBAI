@@ -226,9 +226,6 @@ def _move_dots_to_matching_border(a):
     down_color = a[-1, 1]
 
     for color, block in _find_touching_blocks(inside):
-        if len(block) != 1:
-            continue
-
         r, c = block[0]
         r += 1
         c += 1
