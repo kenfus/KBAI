@@ -2,6 +2,8 @@ import numpy as np
 
 
 def _find_touching_blocks(a, same_color=True):
+    # Findd touching block with the help of a ff-algorithm.
+
     padded = np.pad(a, 1, constant_values=0)
     seen = set()
     blocks = []
@@ -17,7 +19,7 @@ def _find_touching_blocks(a, same_color=True):
             block = []
             seen.add((r, c))
 
-            # Some flood fill algorithm but more readable
+            # While there are cells of this block, "grow it"
             while todo:
                 x, y = todo.pop()
                 block.append((x - 1, y - 1))
@@ -45,18 +47,6 @@ def _box(blocks):
     return min(rows), max(rows), min(cols), max(cols)
 
 
-def _largest_box_cutout(a):
-    # solves: 1cf80156
-    blocks = [block for _, block in _find_touching_blocks(a)]
-    biggest_block = blocks[0]
-    for block in blocks:
-        if len(block) > len(biggest_block):
-            biggest_block = block
-
-    r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0:r1 + 1, c0:c1 + 1]
-
-
 def _largest_mixed_box_cutout(a):
     blocks = [block for _, block in _find_touching_blocks(a, same_color=False)]
     biggest_block = blocks[0]
@@ -66,35 +56,6 @@ def _largest_mixed_box_cutout(a):
 
     r0, r1, c0, c1 = _box(biggest_block)
     return a[r0:r1 + 1, c0:c1 + 1]
-
-
-def _hollow(a):
-    # solves: 4347f46a
-    out = a.copy()
-    for _, blocks in _find_touching_blocks(a):
-        r0, r1, c0, c1 = _box(blocks)
-        for r, c in blocks:
-            is_inside_rows = r0 < r < r1
-            is_inside_cols = c0 < c < c1
-            if is_inside_rows and is_inside_cols:
-                out[r, c] = 0
-    return out
-
-
-def _mark_blocks(a):
-    # solves: ce22a75a
-    marks = np.where(a > 0, 1, 0)
-    # Trick hehe, then  no check about bounds
-    padded_marks = np.pad(marks, 1, constant_values=0)
-    padded_out = np.zeros_like(padded_marks)
-
-    for r in range(padded_marks.shape[0]):
-        for c in range(padded_marks.shape[1]):
-            if padded_marks[r, c] == 1:
-                padded_out[r - 1:r + 2, c - 1:c + 2] = 1
-
-    return padded_out[1:-1, 1:-1]
-
 
 def _AND_top_bot(a, yes=3, no=0):
     mid = a.shape[0] // 2
@@ -109,13 +70,56 @@ def _AND_top_bot(a, yes=3, no=0):
 
     return out
 
+def _largest_box_cutout(a):
+    # 1cf80156
+    blocks = [block for _, block in _find_touching_blocks(a)]
+    biggest_block = blocks[0]
+    for block in blocks:
+        if len(block) > len(biggest_block):
+            biggest_block = block
+
+    r0, r1, c0, c1 = _box(biggest_block)
+    return a[r0:r1 + 1, c0:c1 + 1]
+
+
+
+def _hollow(a):
+    # 4347f46a
+    out = a.copy()
+    for _, blocks in _find_touching_blocks(a):
+        r0, r1, c0, c1 = _box(blocks)
+        for r, c in blocks:
+            is_inside_rows = r0 < r < r1
+            is_inside_cols = c0 < c < c1
+            if is_inside_rows and is_inside_cols:
+                out[r, c] = 0
+    return out
+
+
+def _mark_blocks(a):
+    # ce22a75a
+    marks = np.where(a > 0, 1, 0)
+    # Trick hehe, then  no check about bounds
+    padded_marks = np.pad(marks, 1, constant_values=0)
+    padded_out = np.zeros_like(padded_marks)
+
+    for r in range(padded_marks.shape[0]):
+        for c in range(padded_marks.shape[1]):
+            if padded_marks[r, c] == 1:
+                padded_out[r - 1:r + 2, c - 1:c + 2] = 1
+
+    return padded_out[1:-1, 1:-1]
+
+
+
+
 
 def _AND_left_right(a):
-    # solves: f2829549
+    # f2829549
     mid = a.shape[1] // 2
     left = a[:, :mid]
     right = a[:, mid + 1:]
-    out = np.zeros(left.shape, dtype=int)
+    out = np.zeros(left.shape)
 
     for r in range(left.shape[0]):
         for c in range(left.shape[1]):
@@ -125,81 +129,43 @@ def _AND_left_right(a):
     return out
 
 
-def _mirror_match(a):
-    # solves: 0520fde7
-    mid = a.shape[1] // 2
-    left = a[:, :mid]
-    right = np.fliplr(a[:, mid + 1:])
-    out = np.zeros(left.shape, dtype=int)
-
-    for r in range(left.shape[0]):
-        for c in range(left.shape[1]):
-            if left[r, c] == 1 and right[r, c] == 1:
-                out[r, c] = 2
-
-    return out
-
-
-def _mask_gray_w_input_color(a):
-    # solves: f76d97a5
-    input_color = 0
-    for color in np.unique(a):
-        if color != 5:
-            input_color = color
-
-    out = np.zeros_like(a)
-    for r in range(a.shape[0]):
-        for c in range(a.shape[1]):
-            if a[r, c] == 5:
-                out[r, c] = input_color
-
-    return out
-
-
-def _swap_box_cutout(a):
-    # solves: b94a9452
-    crop = _largest_mixed_box_cutout(a)
-    vals, counts = np.unique(crop[crop != 0], return_counts=True)
-    color_counts = dict(zip(vals, counts))
-    rare_color = min(vals, key=lambda v: color_counts[v])
-    common_color = max(vals, key=lambda v: color_counts[v])
-    out = crop.copy()
-
-    for r in range(crop.shape[0]):
-        for c in range(crop.shape[1]):
-            if crop[r, c] == rare_color:
-                out[r, c] = common_color
-            elif crop[r, c] == common_color:
-                out[r, c] = rare_color
-
-    return out
 
 
 def _turn_sixes_to_twos(a):
-    # solves: b1948b0a
+    # b1948b0a
     out = a.copy()
     out[out == 6] = 2
     return out
 
 
 def _rotate_180(a):
-    # solves: 6150a2bd
+    # 6150a2bd
     return np.rot90(a, 2)
 
 
 def _rotate_90_left(a):
-    # solves: ed36ccf7
+    # ed36ccf7
     return np.rot90(a, 1)
 
 
 def _mirror_bottom_half(a):
-    # solves: f25ffba3
+    # f25ffba3
     bottom = a[a.shape[0] // 2:]
     return np.vstack((np.flipud(bottom), bottom))
 
 
+
+def _top_bottom_shared_black_to_green(a):
+    # 6430c8c4
+    return _AND_top_bot(a, yes=3, no=0)
+
+
+def _top_bottom_shared_black_to_black_else_green(a):
+    # ce4f8723
+    return _AND_top_bot(a, yes=0, no=3)
+
 def _diagonal_cross(a):
-    # solves: 623ea044
+    # 623ea044
     out = a.copy()
     start = np.argwhere(a > 0)[0]
     r, c = start
@@ -216,7 +182,7 @@ def _diagonal_cross(a):
 
 
 def _move_dots_to_matching_border(a):
-    # solves: d687bc17
+    # d687bc17 
     out = a.copy()
     inside = a[1:-1, 1:-1]
 
@@ -244,7 +210,7 @@ def _move_dots_to_matching_border(a):
 
 
 def _labyrinth_fill(a):
-    # solves: 28e73c20
+    # 28e73c20
     green = 3
     wall = 1
     out = np.pad(a, 1, constant_values=wall)
@@ -273,16 +239,54 @@ def _labyrinth_fill(a):
 
     return out[1:-1, 1:-1]
 
+def _mirror_match(a):
+    # 0520fde7
+    mid = a.shape[1] // 2
+    left = a[:, :mid]
+    right = np.fliplr(a[:, mid + 1:])
+    out = np.zeros(left.shape)
 
-def _top_bottom_shared_black_to_green(a):
-    # solves: 6430c8c4
-    return _AND_top_bot(a, yes=3, no=0)
+    for r in range(left.shape[0]):
+        for c in range(left.shape[1]):
+            if left[r, c] == 1 and right[r, c] == 1:
+                out[r, c] = 2
+
+    return out
 
 
-def _top_bottom_shared_black_to_black_else_green(a):
-    # solves: ce4f8723
-    return _AND_top_bot(a, yes=0, no=3)
+def _mask_gray_w_input_color(a):
+    # f76d97a5
+    input_color = 0
+    for color in np.unique(a):
+        if color != 5:
+            input_color = color
 
+    out = np.zeros_like(a)
+    for r in range(a.shape[0]):
+        for c in range(a.shape[1]):
+            if a[r, c] == 5:
+                out[r, c] = input_color
+
+    return out
+
+
+def _swap_box_cutout(a):
+    # b94a9452
+    crop = _largest_mixed_box_cutout(a)
+    vals, counts = np.unique(crop[crop != 0], return_counts=True)
+    color_counts = dict(zip(vals, counts))
+    rare_color = min(vals, key=lambda v: color_counts[v])
+    common_color = max(vals, key=lambda v: color_counts[v])
+    out = crop.copy()
+
+    for r in range(crop.shape[0]):
+        for c in range(crop.shape[1]):
+            if crop[r, c] == rare_color:
+                out[r, c] = common_color
+            elif crop[r, c] == common_color:
+                out[r, c] = rare_color
+
+    return out
 
 
 def _candidates():
@@ -339,7 +343,7 @@ def solve_milestone_B_smart(training_sets, test_grid):
 
 if __name__ == "__main__":
 
-    a = np.zeros((5, 5), dtype=int)
+    a = np.zeros((5, 5))
 
     a = _labyrinth_fill(a)
     print(a)
