@@ -1,7 +1,7 @@
 import numpy as np
 
 from ArcProblem import ArcProblem
-from ArcDSL import solve_milestone_B_dumb
+from ArcDSL import solve_milestone_B_dumb, solve_milestone_D_dumb
 
 
 class ArcAgent:
@@ -31,7 +31,7 @@ class ArcAgent:
 
         predictions: list[np.ndarray] = list()
 
-        output = solve_milestone_B_dumb(
+        output = solve_milestone_D_dumb(
             arc_problem.training_set(),
             arc_problem.test_set().get_input_data().data(),
         )

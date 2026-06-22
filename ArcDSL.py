@@ -57,6 +57,34 @@ def _largest_mixed_box_cutout(a):
     r0, r1, c0, c1 = _box(biggest_block)
     return a[r0:r1 + 1, c0:c1 + 1]
 
+
+def _zoom_in_by_removing_black(a):
+    out = a.copy()
+    top_row, top_col, bottom_row, bottom_col = 0, 0, a.shape[0] - 1, a.shape[1] - 1
+    while top_row < bottom_row and np.all(out[top_row] == 0):
+        top_row += 1
+    while bottom_row > top_row and np.all(out[bottom_row] == 0):
+        bottom_row -= 1
+    while top_col < bottom_col and np.all(out[:, top_col] == 0):
+        top_col += 1
+    while bottom_col > top_col and np.all(out[:, bottom_col] == 0):
+        bottom_col -= 1
+
+    return out[top_row:bottom_row + 1, top_col:bottom_col + 1]
+
+def _cutout_recolor_largest_block_outside_color(a):
+    # Solves 3de23699
+    a = a.copy()
+    cutout = _zoom_in_by_removing_black(a)
+    corner_vals = [cutout[0, 0], cutout[0, -1], cutout[-1, 0], cutout[-1, -1]]
+    color_corners = next(v for v in corner_vals if v != 0)
+    cutout = cutout[1:-1, 1:-1]
+    cutout[cutout != 0] = color_corners
+    return cutout
+
+
+
+
 def _AND_top_bot(a, yes=3, no=0):
     mid = a.shape[0] // 2
     top = a[:mid]
@@ -269,6 +297,28 @@ def _mask_gray_w_input_color(a):
 
     return out
 
+def _diag_from_red_blue(a):
+    # solves 5c0a986e
+    out = a.copy()
+    blocks = _find_touching_blocks(a)
+    for color, block in blocks:
+        if color == 1: # red ->  top-left corner extend up-left
+            r = min(r for r, _ in block)
+            c = min(c for _, c in block)
+            while r >= 0 and c >= 0:
+                out[r, c] = color
+                r -= 1
+                c -= 1
+        elif color == 2: # blue -> bottom-right corner extend down-right
+            r = max(r for r, _ in block)
+            c = max(c for _, c in block)
+            while r < a.shape[0] and c < a.shape[1]:
+                out[r, c] = color
+                r += 1
+                c += 1
+
+    return out
+
 
 def _swap_box_cutout(a):
     # b94a9452
@@ -289,28 +339,101 @@ def _swap_box_cutout(a):
     return out
 
 
+
+def _fill_matching_border_row(a):
+    # solves 22eb0ac0
+    out = a.copy()
+    for r in range(a.shape[0]):
+        if a[r, 0] != 0 and a[r, 0] == a[r, -1]:
+            out[r, :] = a[r, 0]
+    return out
+
+
+def _mirror_2x(a):
+    # solves 62c24649
+    top = np.hstack([a, np.fliplr(a)])
+    return np.vstack([top, np.flipud(top)])
+
+
+def _xor_halves_to_green(a):
+    # solves 3428a4f5
+    sep = np.where(np.all(a == 4, axis=1))[0][0]
+    top, bot = a[:sep], a[sep+1:]
+    return np.where((top != 0) ^ (bot != 0), 3, 0)
+
+
+def _overlay_halves_at_5(a):
+    # solves e98196ab
+    sep = np.where(np.all(a == 5, axis=1))[0][0]
+    top, bot = a[:sep], a[sep+1:]
+    return np.where(top != 0, top, bot)
+
+
+def _staircase(a):
+    # solves bbc9ae5d
+    row = a[0]
+    color = row[row != 0][0]
+    n_color = np.sum(row != 0)
+    n_rows = a.shape[1] // 2
+    out = np.zeros((n_rows, a.shape[1]), dtype=a.dtype)
+    for r in range(n_rows):
+        out[r, :n_color + r] = color
+    return out
+
+
+
+def _transpose(a):
+    # solves 74dd1130
+    return a.T.copy()
+
+
+def _overlay_3_sections(a):
+    # solves cf98881b
+    sep_cols = [c for c in range(a.shape[1]) if np.all(a[:, c] == 2)]
+    c1, c2 = sep_cols[0], sep_cols[1]
+    left, middle, right = a[:, :c1], a[:, c1+1:c2], a[:, c2+1:]
+    return np.where(left != 0, left, np.where(middle != 0, middle, right))
+
+
 def _candidates():
-    return (
-        _labyrinth_fill,
-        _rotate_180,
-        _rotate_90_left,
-        _turn_sixes_to_twos,
-        _mirror_bottom_half,
-        _mirror_match,
-        _largest_box_cutout,
-        _hollow,
-        _mark_blocks,
-        _mask_gray_w_input_color,
-        _swap_box_cutout,
-        _top_bottom_shared_black_to_green,
-        _top_bottom_shared_black_to_black_else_green,
-        _AND_left_right,
-        _diagonal_cross,
-        _move_dots_to_matching_border,
-    )
+    return [
+        _cutout_recolor_largest_block_outside_color,
+        _diag_from_red_blue,
+        _fill_matching_border_row,
+        _mirror_2x,
+        _xor_halves_to_green,
+        _overlay_halves_at_5,
+        _staircase,
+        _transpose,
+        _overlay_3_sections,
+    ]
+
 
 
 def solve_milestone_B_dumb(training_sets, test_grid):
+    train = [
+        (pair.get_input_data().data(), pair.get_output_data().data())
+        for pair in training_sets
+    ]
+    test = np.asarray(test_grid)
+
+    for transform in _candidates():
+        try:
+            works = True
+            for inp, out in train:
+                if not np.array_equal(transform(inp), out):
+                    works = False
+                    break   
+            if works:
+                return transform(test)
+            else:
+                pass
+        except:
+            # print(f"Error with transform: {transform} on {test} with train {train}")
+            pass
+    return None
+
+def solve_milestone_D_dumb(training_sets, test_grid):
     train = [
         (pair.get_input_data().data(), pair.get_output_data().data())
         for pair in training_sets
@@ -343,7 +466,9 @@ def solve_milestone_B_smart(training_sets, test_grid):
 
 if __name__ == "__main__":
 
-    a = np.zeros((5, 5))
+    a = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 2, 0, 0, 0, 0, 2, 2, 0, 0], [0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 2, 0, 0, 0, 0, 0, 0], [0, 0, 0, 2, 2, 2, 0, 0, 0, 0], [0, 0, 0, 0, 0, 2, 0, 0, 2, 0], [0, 0, 0, 0, 0, 0, 0, 0, 2, 0], [0, 0, 0, 0, 2, 2, 0, 0, 0, 0]]
 
-    a = _labyrinth_fill(a)
+    a = np.array(a)
+    a = _diag_from_red_blue(a)
+
     print(a)
