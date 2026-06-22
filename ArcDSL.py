@@ -302,7 +302,7 @@ def _diag_from_red_blue(a):
     out = a.copy()
     blocks = _find_touching_blocks(a)
     for color, block in blocks:
-        if color == 1: # red ->  top-left corner extend up-left
+        if color == 1: # red ->  top-left  extend up-left
             r = min(r for r, _ in block)
             c = min(c for _, c in block)
             while r >= 0 and c >= 0:
@@ -359,7 +359,14 @@ def _xor_halves_to_green(a):
     # solves 3428a4f5
     sep = np.where(np.all(a == 4, axis=1))[0][0]
     top, bot = a[:sep], a[sep+1:]
-    return np.where((top != 0) ^ (bot != 0), 3, 0)
+    out = np.zeros_like(top)
+    for r in range(top.shape[0]):
+        for c in range(top.shape[1]):
+            only_top = top[r, c] != 0 and bot[r, c] == 0
+            only_bot = top[r, c] == 0 and bot[r, c] != 0
+            if only_top or only_bot:
+                out[r, c] = 3
+    return out
 
 
 def _overlay_halves_at_5(a):
@@ -370,12 +377,12 @@ def _overlay_halves_at_5(a):
 
 
 def _staircase(a):
-    # solves bbc9ae5d
+    # solves bbc9ae5d 
     row = a[0]
     color = row[row != 0][0]
     n_color = np.sum(row != 0)
     n_rows = a.shape[1] // 2
-    out = np.zeros((n_rows, a.shape[1]), dtype=a.dtype)
+    out = np.zeros((n_rows, a.shape[1]))
     for r in range(n_rows):
         out[r, :n_color + r] = color
     return out
@@ -392,7 +399,16 @@ def _overlay_3_sections(a):
     sep_cols = [c for c in range(a.shape[1]) if np.all(a[:, c] == 2)]
     c1, c2 = sep_cols[0], sep_cols[1]
     left, middle, right = a[:, :c1], a[:, c1+1:c2], a[:, c2+1:]
-    return np.where(left != 0, left, np.where(middle != 0, middle, right))
+    out = np.zeros_like(left)
+    for r in range(left.shape[0]):
+        for c in range(left.shape[1]):
+            if left[r, c] != 0:
+                out[r, c] = left[r, c]
+            elif middle[r, c] != 0:
+                out[r, c] = middle[r, c]
+            else:
+                out[r, c] = right[r, c]
+    return out
 
 
 def _candidates():
