@@ -36,33 +36,36 @@ class GameAgent:
 
     def cf_move(self, game: Game):
         board = game.get_board()
-        token_opp = game.player2_token() if game.player1_token() == self._token else game.player1_token()
+
+
+        token_opps = [game.player1_token() ,game.player2_token(), game.player3_token()]
+        token_opps.remove(self._token)
+        token_opps = [t for t in token_opps if t is not None]
+
+        how_many_to_win = game.number_of_seq_tokens_needed()
 
         rows, cols = board.shape
         #Win if possible
-        move = GameAgent._find_if_winning_move_c4_possible(board, self._token)
+        move = GameAgent._find_if_winning_move_c4_possible(board, self._token, how_many_to_win)
         if move is not None:
             return move
 
         #Block opponent winning move
-        move = GameAgent._find_if_winning_move_c4_possible(board, token_opp)
-        if move is not None:
-            return move
+        for token_opp in token_opps:
+            move = GameAgent._find_if_winning_move_c4_possible(board, token_opp, how_many_to_win)
+            if move is not None:
+                return move
 
         # Board is empty start in the center
         if (board == '').all():
             return int(cols // 2)
 
-        #Take first available free space column from the middle.. 
-        for c in range(cols // 2, cols):
-            for r in range(rows - 1, -1, -1):
-                if board[r][c] == '':
-                    return c
-                
-        for c in range(cols // 2 - 1, -1, -1):
-            for r in range(rows - 1, -1, -1):
-                if board[r][c] == '':
-                    return c
+        #Take first available free space column from the middle..
+        columns_from_middle = list(range(cols // 2, cols)) + list(range(cols // 2 - 1, -1, -1))
+        for c in columns_from_middle:
+            if GameAgent._c4_column_has_enough_open_spaces(board, c, how_many_to_win):
+                return c
+
         # Else random 
         return -1
 
@@ -99,17 +102,24 @@ class GameAgent:
     
     def _c4_position_is_playable(board, row, col):
         return row == board.shape[0] - 1 or board[row + 1][col] != ''
+
+    def _c4_column_has_space(board, col):
+        return '' in board[:, col]
+
+    def _c4_column_has_enough_open_spaces(board, col, needed):
+        return list(board[:, col]).count('') >= needed
     
 
-    def _find_if_winning_move_c4_possible(board, token):
+
+    def _find_if_winning_move_c4_possible(board, token, n):
         val = token.value()
         rows, cols = board.shape
 
         # Check horizontal
         for r in range(rows):
-            for c in range(cols - 3):
-                window = board[r, c:c+4]
-                if list(window).count(val) == 3 and list(window).count('') == 1:
+            for c in range(cols - n + 1):
+                window = board[r, c:c+n]
+                if list(window).count(val) == n - 1 and list(window).count('') == 1:
                     empty_idx = list(window).index('')
                     move_col = c + empty_idx
                     if GameAgent._c4_position_is_playable(board, r, move_col):
@@ -118,20 +128,20 @@ class GameAgent:
 
         # Check vertical
         for c in range(cols):
-            for r in range(rows - 3):
-                window = board[r:r+4, c]
-                if list(window).count(val) == 3 and list(window).count('') == 1:
+            for r in range(rows - n + 1):
+                window = board[r:r+n, c]
+                if list(window).count(val) == n - 1 and list(window).count('') == 1:
                     empty_idx = list(window).index('')
                     move_row = r + empty_idx
                     if GameAgent._c4_position_is_playable(board, move_row, c):
                         return c
 
 
-        # Check diagonal (bottom-left to top-right)
-        for r in range(3, rows):
-            for c in range(cols - 3):
-                window = [board[r-i][c+i] for i in range(4)]
-                if window.count(val) == 3 and window.count('') == 1:
+        # Check diagonal (bottom-left to top-right) 
+        for r in range(n - 1, rows):
+            for c in range(cols - n + 1):
+                window = [board[r-i][c+i] for i in range(n)]
+                if window.count(val) == n - 1 and window.count('') == 1:
                     empty_idx = window.index('')
                     move_row = r - empty_idx
                     move_col = c + empty_idx
@@ -140,11 +150,11 @@ class GameAgent:
                 
 
 
-        # Check diagonal (top-left to bottom-right)
-        for r in range(rows - 3):
-            for c in range(cols - 3):
-                window = [board[r+i][c+i] for i in range(4)]
-                if window.count(val) == 3 and window.count('') == 1:
+        # Check diagonal  (top-left to bottom-right)
+        for r in range(rows - n + 1):
+            for c in range(cols - n + 1):
+                window = [board[r+i][c+i] for i in range(n)]
+                if window.count(val) == n - 1 and window.count('') == 1:
                     empty_idx = window.index('')
                     move_row = r + empty_idx
                     move_col = c + empty_idx
