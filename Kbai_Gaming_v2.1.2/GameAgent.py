@@ -27,8 +27,44 @@ class GameAgent:
     def make_move(self, game: Game) -> Tuple[int, int] | int:
         if game.get_type() == Type.TIC_TAC_TOE:
             return self.ttt_move(game)
+        elif game.get_type() in [Type.CONNECT_4_BASIC, Type.CONNECT_4_EXTENDED, Type.CONNECT_4_MULTIPLAYER, Type.CONNECT_4_HIDDEN_MULTIPLAYER]:
+            return self.cf_move(game)
         else:
             return -1 
+
+
+
+    def cf_move(self, game: Game):
+        board = game.get_board()
+        token_opp = game.player2_token() if game.player1_token() == self._token else game.player1_token()
+
+        rows, cols = board.shape
+        #Win if possible
+        move = GameAgent._find_if_winning_move_c4_possible(board, self._token)
+        if move is not None:
+            return move
+
+        #Block opponent winning move
+        move = GameAgent._find_if_winning_move_c4_possible(board, token_opp)
+        if move is not None:
+            return move
+
+        # Board is empty start in the center
+        if (board == '').all():
+            return int(cols // 2)
+
+        #Take first available free space column from the middle.. 
+        for c in range(cols // 2, cols):
+            for r in range(rows - 1, -1, -1):
+                if board[r][c] == '':
+                    return c
+                
+        for c in range(cols // 2 - 1, -1, -1):
+            for r in range(rows - 1, -1, -1):
+                if board[r][c] == '':
+                    return c
+        # Else random 
+        return -1
 
     def ttt_move(self, game: Game):
         board = game.get_board()
@@ -58,6 +94,66 @@ class GameAgent:
                 return (r, c)
 
         return (-1, -1)
+    
+
+    
+    def _c4_position_is_playable(board, row, col):
+        return row == board.shape[0] - 1 or board[row + 1][col] != ''
+    
+
+    def _find_if_winning_move_c4_possible(board, token):
+        val = token.value()
+        rows, cols = board.shape
+
+        # Check horizontal
+        for r in range(rows):
+            for c in range(cols - 3):
+                window = board[r, c:c+4]
+                if list(window).count(val) == 3 and list(window).count('') == 1:
+                    empty_idx = list(window).index('')
+                    move_col = c + empty_idx
+                    if GameAgent._c4_position_is_playable(board, r, move_col):
+                        return move_col
+                
+
+        # Check vertical
+        for c in range(cols):
+            for r in range(rows - 3):
+                window = board[r:r+4, c]
+                if list(window).count(val) == 3 and list(window).count('') == 1:
+                    empty_idx = list(window).index('')
+                    move_row = r + empty_idx
+                    if GameAgent._c4_position_is_playable(board, move_row, c):
+                        return c
+
+
+        # Check diagonal (bottom-left to top-right)
+        for r in range(3, rows):
+            for c in range(cols - 3):
+                window = [board[r-i][c+i] for i in range(4)]
+                if window.count(val) == 3 and window.count('') == 1:
+                    empty_idx = window.index('')
+                    move_row = r - empty_idx
+                    move_col = c + empty_idx
+                    if GameAgent._c4_position_is_playable(board, move_row, move_col):
+                        return move_col
+                
+
+
+        # Check diagonal (top-left to bottom-right)
+        for r in range(rows - 3):
+            for c in range(cols - 3):
+                window = [board[r+i][c+i] for i in range(4)]
+                if window.count(val) == 3 and window.count('') == 1:
+                    empty_idx = window.index('')
+                    move_row = r + empty_idx
+                    move_col = c + empty_idx
+                    if GameAgent._c4_position_is_playable(board, move_row, move_col):
+                        return move_col
+                    
+
+        return None
+
 
     def _find_if_winning_move_possible(board, token):
         val = token.value()
