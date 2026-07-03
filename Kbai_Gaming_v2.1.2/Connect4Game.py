@@ -25,7 +25,7 @@ def column_has_space(board: np.ndarray, col: int) -> bool:
     :param col: a column index
     """
     try:
-        return np.isin(str(''), board[:, col]).sum()
+        return np.isin(str(""), board[:, col]).sum()
     except IndexError:
         return False
 
@@ -39,7 +39,7 @@ def drop_piece(board: np.ndarray, col: int, token: Token) -> None:
     :returns None
     """
     for row in reversed(range(board.shape[0])):
-        if np.isin(str(''), board[row][col]):
+        if np.isin(str(""), board[row][col]):
             board[row][col] = token.value()
             break
 
@@ -76,7 +76,7 @@ def is_winning_move(board: np.ndarray, token: Token, seq: int) -> bool:
             if board[row, col] == token.value():
                 count = 1
                 for idx in range(1, seq):
-                    if board[row+idx, col] == token.value():
+                    if board[row + idx, col] == token.value():
                         count += 1
                     else:
                         break
@@ -89,7 +89,7 @@ def is_winning_move(board: np.ndarray, token: Token, seq: int) -> bool:
             if board[row, col] == token.value():
                 count = 1
                 for idx in range(1, seq):
-                    if board[row+idx, col+idx] == token.value():
+                    if board[row + idx, col + idx] == token.value():
                         count += 1
                     else:
                         break
@@ -102,7 +102,7 @@ def is_winning_move(board: np.ndarray, token: Token, seq: int) -> bool:
             if board[row, col] == token.value():
                 count = 1
                 for idx in range(1, seq):
-                    if board[row+idx, col-idx] == token.value():
+                    if board[row + idx, col - idx] == token.value():
                         count += 1
                     else:
                         break
@@ -128,7 +128,9 @@ def make_random_move(board: np.ndarray) -> int:
     :param board: the current board state
     :return: a randomly selected move from the available moves
     """
-    available_moves = list([x for x in range(board.shape[1]) if column_has_space(board, x)])
+    available_moves = list(
+        [x for x in range(board.shape[1]) if column_has_space(board, x)]
+    )
     return random.choice(available_moves)
 
 
@@ -154,15 +156,29 @@ class Connect4Game:
                 row, col, seq = 6, 7, 4
 
         board = create_board(row, col)
-        hidden_token = Token('H')
+        hidden_token = Token("H")
         player3_token = None if player3 is None else player3.token()
-        game = Game(self._play_type, board, seq, no_of_players, player1.token(), player2.token(), player3_token)
+        game = Game(
+            self._play_type,
+            board,
+            seq,
+            no_of_players,
+            player1.token(),
+            player2.token(),
+            player3_token,
+        )
         game_over = False
 
         turn = random.randint(0, no_of_players - 1)  # randomly selects who goes first
-        first_player = f"Player({game.player1_token().value()})" if turn == 0 \
-            else f"Opponent({game.player2_token().value()})" if turn == 1 \
-            else f"Opponent({game.player3_token().value()})"
+        first_player = (
+            f"Player({game.player1_token().value()})"
+            if turn == 0
+            else (
+                f"Opponent({game.player2_token().value()})"
+                if turn == 1
+                else f"Opponent({game.player3_token().value()})"
+            )
+        )
 
         player1_moves = list()
         player2_moves = list()
@@ -180,10 +196,14 @@ class Connect4Game:
                 board = game.get_board()
                 temp_board = game.get_board()
                 if hide_pieces:
-                    temp_board[(temp_board == player2.token().value())
-                               | (temp_board == player3.token().value())] = hidden_token.value()
+                    temp_board[
+                        (temp_board == player2.token().value())
+                        | (temp_board == player3.token().value())
+                    ] = hidden_token.value()
 
-                game.update_board(temp_board)  # replace gameboard before sending to the agent
+                game.update_board(
+                    temp_board
+                )  # replace gameboard before sending to the agent
 
                 try:
                     col = player1.make_move(game)
@@ -225,8 +245,10 @@ class Connect4Game:
                 board = game.get_board()
                 temp_board = game.get_board()
                 if hide_pieces:
-                    temp_board[(temp_board == player1.token().value())
-                               | (temp_board == player3.token().value())] = hidden_token.value()
+                    temp_board[
+                        (temp_board == player1.token().value())
+                        | (temp_board == player3.token().value())
+                    ] = hidden_token.value()
 
                 game.update_board(temp_board)
 
@@ -269,8 +291,10 @@ class Connect4Game:
                 board = game.get_board()
                 temp_board = game.get_board()
                 if hide_pieces:
-                    temp_board[(temp_board == player1.token().value())
-                               | (temp_board == player2.token().value())] = hidden_token.value()
+                    temp_board[
+                        (temp_board == player1.token().value())
+                        | (temp_board == player2.token().value())
+                    ] = hidden_token.value()
 
                 game.update_board(temp_board)
 
@@ -322,6 +346,14 @@ class Connect4Game:
 
         end_time = time.time()
         game_time = end_time - start_time
-        game_stats = GameStats(name, game_status, first_player, game_time, game,
-                               player1_moves, player2_moves, player3_moves)
+        game_stats = GameStats(
+            name,
+            game_status,
+            first_player,
+            game_time,
+            game,
+            player1_moves,
+            player2_moves,
+            player3_moves,
+        )
         return game_stats

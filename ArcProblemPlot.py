@@ -27,8 +27,8 @@ class ArcPlot:
 
         # cmap is the color map to use and vmin/vmax limits the color scale to 10 values (0-9)
         axis.pcolormesh(arc_grid, cmap=arc_colors, vmin=0, vmax=9)
-        axis.set_xticks(np.arange(0, arc_grid.shape[1]+1, 1))
-        axis.set_yticks(np.arange(0, arc_grid.shape[0]+1, 1))
+        axis.set_xticks(np.arange(0, arc_grid.shape[1] + 1, 1))
+        axis.set_yticks(np.arange(0, arc_grid.shape[0] + 1, 1))
         axis.grid()
         axis.set_aspect(1)
         axis.invert_yaxis()
@@ -41,7 +41,7 @@ class ArcPlot:
         primary_fig = pyplot.figure(constrained_layout=True, dpi=100)
         primary_fig.suptitle(problem.problem_name())
 
-        grid_spec = GridSpec(nrows=last_idx+1, ncols=2, figure=primary_fig)
+        grid_spec = GridSpec(nrows=last_idx + 1, ncols=2, figure=primary_fig)
 
         for idx, train in enumerate(problem.training_set()):
             in_sub_fig = primary_fig.add_subfigure(grid_spec[idx, 0])
@@ -71,24 +71,27 @@ class ArcPlot:
         return primary_fig
 
 
-if __name__ == '__main__':
-    file_path = filedialog.askopenfilename(initialdir='data', filetypes=[('JSON,', '*.json')],
-                                           title='Choose a Problem to Plot')
+if __name__ == "__main__":
+    file_path = filedialog.askopenfilename(
+        initialdir="data",
+        filetypes=[("JSON,", "*.json")],
+        title="Choose a Problem to Plot",
+    )
     file_name = os.path.basename(file_path)
     # opens the file and reads in the data into python objects
     with open(os.path.join(file_path)) as p:
         flat_data: dict[str, dict] = json.load(p)
         trn_data: list[ArcSet] = list()
-        for dt in flat_data['train']:
-            d_input = ArcData(np.array(dt['input']))
-            d_output = ArcData(np.array(dt['output']))
+        for dt in flat_data["train"]:
+            d_input = ArcData(np.array(dt["input"]))
+            d_output = ArcData(np.array(dt["output"]))
             trn_set: ArcSet = ArcSet(arc_input=d_input, arc_output=d_output)
             trn_data.append(trn_set)
 
         tst_data: list[ArcSet] = list()
-        for tst in flat_data['test']:
-            t_input = ArcData(np.array(tst['input']))
-            t_output = ArcData(np.array(tst['output']))
+        for tst in flat_data["test"]:
+            t_input = ArcData(np.array(tst["input"]))
+            t_output = ArcData(np.array(tst["output"]))
             tst_set: ArcSet = ArcSet(arc_input=t_input, arc_output=t_output)
             tst_data.append(tst_set)
 
@@ -102,8 +105,11 @@ if __name__ == '__main__':
         # To save the plot as a PDF file, uncomment the next 5 lines
 
         save_file_name = f'{file_name.strip(".json")}.pdf'
-        file_path = filedialog.asksaveasfilename(initialdir='data', initialfile=save_file_name,
-                                                 filetypes=[('PDF,', '*.pdf')], title='Choose directory to save file')
-        pyplot.savefig(file_path, format='pdf')
+        file_path = filedialog.asksaveasfilename(
+            initialdir="data",
+            initialfile=save_file_name,
+            filetypes=[("PDF,", "*.pdf")],
+            title="Choose directory to save file",
+        )
+        pyplot.savefig(file_path, format="pdf")
         pyplot.close()
-

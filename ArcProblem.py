@@ -9,6 +9,7 @@ class ArcProblem:
     a list of training data (ArcSet(s))
     and a test set (ArcSet).
     """
+
     def __init__(self, problem_name: str, train: list[ArcSet], test: ArcSet):
         self._id = problem_name
         self._training_data: list[ArcSet] = train

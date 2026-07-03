@@ -9,6 +9,7 @@ class ArcData:
     From an Arc problem perspective this represents a single grid of data
     either input data or output data.
     """
+
     def __init__(self, data: np.ndarray):
         self._arc_array: np.ndarray = np.array(data)
 

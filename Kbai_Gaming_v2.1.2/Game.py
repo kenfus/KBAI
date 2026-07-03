@@ -9,6 +9,7 @@ class Type(Enum):
     """
     An Enum of the types of Games this object can represent
     """
+
     TIC_TAC_TOE = 0
     CONNECT_4_BASIC = 1
     CONNECT_4_EXTENDED = 2
@@ -26,8 +27,17 @@ class Game:
     """
     A general container that represents a single game specified by the game type and final board
     """
-    def __init__(self, game_type: Type, board: np.ndarray, seq_of_tokens_needed: int, number_of_players: int,
-                 player1_token: Token, opp_token: Token, alt_opp_token: Token = None):
+
+    def __init__(
+        self,
+        game_type: Type,
+        board: np.ndarray,
+        seq_of_tokens_needed: int,
+        number_of_players: int,
+        player1_token: Token,
+        opp_token: Token,
+        alt_opp_token: Token = None,
+    ):
         """
         :param game_type: the type of game being played; see Type above for a listing
         :param board: the current board state
@@ -124,12 +134,17 @@ class Game:
         :param other: the other game object to compare to
         :return: True if they are the same otherwise False
         """
-        if (self.get_type() is other.get_type()
+        if (
+            (
+                self.get_type() is other.get_type()
                 and np.equal(self.get_board(), other.get_board())
                 and self.number_of_players() == other.get_number_of_players()
-                and self.number_of_seq_tokens_needed() == other.number_of_seq_tokens_needed()) \
-                and self.player1_token() == other.player1_token() \
-                and self.player2_token() == other.player2_token() \
-                and self.player3_token() == other.player3_token():
+                and self.number_of_seq_tokens_needed()
+                == other.number_of_seq_tokens_needed()
+            )
+            and self.player1_token() == other.player1_token()
+            and self.player2_token() == other.player2_token()
+            and self.player3_token() == other.player3_token()
+        ):
             return True
         return False

@@ -12,6 +12,7 @@ class ArcSet:
     transformation from the input
     or the answer to a test problem.
     """
+
     def __init__(self, arc_input: ArcData, arc_output: ArcData = None):
         self._input = arc_input
         self._output = arc_output
@@ -41,11 +42,12 @@ class ArcSet:
         the same size and data;
         False otherwise.
         """
-        return (self.get_input_data().__eq__(other.get_input_data())
-                and self.get_output_data().__eq__(other.get_output_data()))
+        return self.get_input_data().__eq__(
+            other.get_input_data()
+        ) and self.get_output_data().__eq__(other.get_output_data())
 
     def to_dict(self):
         data_dict: dict[str, list[int]] = dict()
-        data_dict['input'] = self._input.to_list()
-        data_dict['output'] = self._output.to_list()
+        data_dict["input"] = self._input.to_list()
+        data_dict["output"] = self._output.to_list()
         return data_dict

@@ -55,7 +55,7 @@ def _largest_mixed_box_cutout(a):
             biggest_block = block
 
     r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0:r1 + 1, c0:c1 + 1]
+    return a[r0 : r1 + 1, c0 : c1 + 1]
 
 
 def _zoom_in_by_removing_black(a):
@@ -70,7 +70,8 @@ def _zoom_in_by_removing_black(a):
     while bottom_col > top_col and np.all(out[:, bottom_col] == 0):
         bottom_col -= 1
 
-    return out[top_row:bottom_row + 1, top_col:bottom_col + 1]
+    return out[top_row : bottom_row + 1, top_col : bottom_col + 1]
+
 
 def _cutout_recolor_largest_block_outside_color(a):
     # Solves 3de23699
@@ -83,12 +84,10 @@ def _cutout_recolor_largest_block_outside_color(a):
     return cutout
 
 
-
-
 def _AND_top_bot(a, yes=3, no=0):
     mid = a.shape[0] // 2
     top = a[:mid]
-    bottom = a[mid + 1:]
+    bottom = a[mid + 1 :]
     out = np.full(top.shape, no)
 
     for r in range(top.shape[0]):
@@ -97,6 +96,7 @@ def _AND_top_bot(a, yes=3, no=0):
                 out[r, c] = yes
 
     return out
+
 
 def _largest_box_cutout(a):
     # 1cf80156
@@ -107,8 +107,7 @@ def _largest_box_cutout(a):
             biggest_block = block
 
     r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0:r1 + 1, c0:c1 + 1]
-
+    return a[r0 : r1 + 1, c0 : c1 + 1]
 
 
 def _hollow(a):
@@ -134,19 +133,16 @@ def _mark_blocks(a):
     for r in range(padded_marks.shape[0]):
         for c in range(padded_marks.shape[1]):
             if padded_marks[r, c] == 1:
-                padded_out[r - 1:r + 2, c - 1:c + 2] = 1
+                padded_out[r - 1 : r + 2, c - 1 : c + 2] = 1
 
     return padded_out[1:-1, 1:-1]
-
-
-
 
 
 def _AND_left_right(a):
     # f2829549
     mid = a.shape[1] // 2
     left = a[:, :mid]
-    right = a[:, mid + 1:]
+    right = a[:, mid + 1 :]
     out = np.zeros(left.shape)
 
     for r in range(left.shape[0]):
@@ -155,8 +151,6 @@ def _AND_left_right(a):
                 out[r, c] = 3
 
     return out
-
-
 
 
 def _turn_sixes_to_twos(a):
@@ -178,9 +172,8 @@ def _rotate_90_left(a):
 
 def _mirror_bottom_half(a):
     # f25ffba3
-    bottom = a[a.shape[0] // 2:]
+    bottom = a[a.shape[0] // 2 :]
     return np.vstack((np.flipud(bottom), bottom))
-
 
 
 def _top_bottom_shared_black_to_green(a):
@@ -191,6 +184,7 @@ def _top_bottom_shared_black_to_green(a):
 def _top_bottom_shared_black_to_black_else_green(a):
     # ce4f8723
     return _AND_top_bot(a, yes=0, no=3)
+
 
 def _diagonal_cross(a):
     # 623ea044
@@ -210,7 +204,7 @@ def _diagonal_cross(a):
 
 
 def _move_dots_to_matching_border(a):
-    # d687bc17 
+    # d687bc17
     out = a.copy()
     inside = a[1:-1, 1:-1]
 
@@ -244,7 +238,7 @@ def _labyrinth_fill(a):
     out = np.pad(a, 1, constant_values=wall)
     directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
     direction = (0, 1)
-    r, c = (1, 1) # BUG HERE BECAUSE OFPAD ARGH!!!
+    r, c = (1, 1)  # BUG HERE BECAUSE OFPAD ARGH!!!
     curr_diretion_idx = 0
     turns_in_a_row = 0
 
@@ -253,7 +247,11 @@ def _labyrinth_fill(a):
         next_cell = r + direction[0], c + direction[1]
         next_two_cells = (r + 2 * direction[0], c + 2 * direction[1])
         can_move = True
-        if out[next_cell] == wall or out[next_cell] == green or out[next_two_cells] == green:
+        if (
+            out[next_cell] == wall
+            or out[next_cell] == green
+            or out[next_two_cells] == green
+        ):
             can_move = False
         if can_move:
             r, c = next_cell
@@ -267,11 +265,12 @@ def _labyrinth_fill(a):
 
     return out[1:-1, 1:-1]
 
+
 def _mirror_match(a):
     # 0520fde7
     mid = a.shape[1] // 2
     left = a[:, :mid]
-    right = np.fliplr(a[:, mid + 1:])
+    right = np.fliplr(a[:, mid + 1 :])
     out = np.zeros(left.shape)
 
     for r in range(left.shape[0]):
@@ -297,19 +296,20 @@ def _mask_gray_w_input_color(a):
 
     return out
 
+
 def _diag_from_red_blue(a):
     # solves 5c0a986e
     out = a.copy()
     blocks = _find_touching_blocks(a)
     for color, block in blocks:
-        if color == 1: # red ->  top-left  extend up-left
+        if color == 1:  # red ->  top-left  extend up-left
             r = min(r for r, _ in block)
             c = min(c for _, c in block)
             while r >= 0 and c >= 0:
                 out[r, c] = color
                 r -= 1
                 c -= 1
-        elif color == 2: # blue -> bottom-right corner extend down-right
+        elif color == 2:  # blue -> bottom-right corner extend down-right
             r = max(r for r, _ in block)
             c = max(c for _, c in block)
             while r < a.shape[0] and c < a.shape[1]:
@@ -339,7 +339,6 @@ def _swap_box_cutout(a):
     return out
 
 
-
 def _fill_matching_border_row(a):
     # solves 22eb0ac0
     out = a.copy()
@@ -358,7 +357,7 @@ def _mirror_2x(a):
 def _xor_halves_to_green(a):
     # solves 3428a4f5
     sep = np.where(np.all(a == 4, axis=1))[0][0]
-    top, bot = a[:sep], a[sep+1:]
+    top, bot = a[:sep], a[sep + 1 :]
     out = np.zeros_like(top)
     for r in range(top.shape[0]):
         for c in range(top.shape[1]):
@@ -372,21 +371,20 @@ def _xor_halves_to_green(a):
 def _overlay_halves_at_5(a):
     # solves e98196ab
     sep = np.where(np.all(a == 5, axis=1))[0][0]
-    top, bot = a[:sep], a[sep+1:]
+    top, bot = a[:sep], a[sep + 1 :]
     return np.where(top != 0, top, bot)
 
 
 def _staircase(a):
-    # solves bbc9ae5d 
+    # solves bbc9ae5d
     row = a[0]
     color = row[row != 0][0]
     n_color = np.sum(row != 0)
     n_rows = a.shape[1] // 2
     out = np.zeros((n_rows, a.shape[1]))
     for r in range(n_rows):
-        out[r, :n_color + r] = color
+        out[r, : n_color + r] = color
     return out
-
 
 
 def _transpose(a):
@@ -398,7 +396,7 @@ def _overlay_3_sections(a):
     # solves cf98881b
     sep_cols = [c for c in range(a.shape[1]) if np.all(a[:, c] == 2)]
     c1, c2 = sep_cols[0], sep_cols[1]
-    left, middle, right = a[:, :c1], a[:, c1+1:c2], a[:, c2+1:]
+    left, middle, right = a[:, :c1], a[:, c1 + 1 : c2], a[:, c2 + 1 :]
     out = np.zeros_like(left)
     for r in range(left.shape[0]):
         for c in range(left.shape[1]):
@@ -425,7 +423,6 @@ def _candidates():
     ]
 
 
-
 def solve_milestone_B_dumb(training_sets, test_grid):
     train = [
         (pair.get_input_data().data(), pair.get_output_data().data())
@@ -439,7 +436,7 @@ def solve_milestone_B_dumb(training_sets, test_grid):
             for inp, out in train:
                 if not np.array_equal(transform(inp), out):
                     works = False
-                    break   
+                    break
             if works:
                 return transform(test)
             else:
@@ -448,6 +445,7 @@ def solve_milestone_B_dumb(training_sets, test_grid):
             # print(f"Error with transform: {transform} on {test} with train {train}")
             pass
     return None
+
 
 def solve_milestone_D_dumb(training_sets, test_grid):
     train = [
@@ -462,7 +460,7 @@ def solve_milestone_D_dumb(training_sets, test_grid):
             for inp, out in train:
                 if not np.array_equal(transform(inp), out):
                     works = False
-                    break   
+                    break
             if works:
                 return transform(test)
             else:
@@ -474,7 +472,7 @@ def solve_milestone_D_dumb(training_sets, test_grid):
 
 
 def solve_milestone_B_smart(training_sets, test_grid):
-    # TODO: Define  transformation as classes, then do some embedding on it and then train a small calssifier on it. 
+    # TODO: Define  transformation as classes, then do some embedding on it and then train a small calssifier on it.
     # Embedding is probably just  a description of matrixes, such  as it it smaller, did the color change etc etc etc
     # probably a lot of booleans with then some floats for e.g. the ratio of colors etc etc etc.
     pass
@@ -482,7 +480,16 @@ def solve_milestone_B_smart(training_sets, test_grid):
 
 if __name__ == "__main__":
 
-    a = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 2, 0, 0, 0, 0, 2, 2, 0, 0], [0, 2, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 2, 0, 0, 0, 0, 0, 0], [0, 0, 0, 2, 2, 2, 0, 0, 0, 0], [0, 0, 0, 0, 0, 2, 0, 0, 2, 0], [0, 0, 0, 0, 0, 0, 0, 0, 2, 0], [0, 0, 0, 0, 2, 2, 0, 0, 0, 0]]
+    a = [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 2, 0, 0, 0, 0, 2, 2, 0, 0],
+        [0, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 2, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 2, 2, 2, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 2, 0, 0, 2, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+        [0, 0, 0, 0, 2, 2, 0, 0, 0, 0],
+    ]
 
     a = np.array(a)
     a = _diag_from_red_blue(a)

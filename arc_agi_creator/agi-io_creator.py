@@ -14,45 +14,49 @@ import numpy as np
 from CreatorArcData import ArcData
 from CreatorArcSet import ArcSet
 
-UNFILLED = 'black'
-BLUE = 'blue'
-RED = 'red'
-GREEN = 'green3'
-YELLOW = 'yellow'
-GREY = 'grey50'
-MAGENTA = 'magenta'
-ORANGE = 'orange2'
-CYAN = 'cyan'
-BROWN = 'saddle brown'
+UNFILLED = "black"
+BLUE = "blue"
+RED = "red"
+GREEN = "green3"
+YELLOW = "yellow"
+GREY = "grey50"
+MAGENTA = "magenta"
+ORANGE = "orange2"
+CYAN = "cyan"
+BROWN = "saddle brown"
 
 colors = (UNFILLED, BLUE, RED, GREEN, YELLOW, GREY, MAGENTA, ORANGE, CYAN, BROWN)
 
-OUTLINE = 'DeepSkyBlue2'
+OUTLINE = "DeepSkyBlue2"
 
-INPUT = 'input'
-OUTPUT = 'output'
+INPUT = "input"
+OUTPUT = "output"
 DEFAULT_SIZE = 4
 
 
 class Creator:
     def __init__(self, frame: ttkthemes.ThemedTk):
-        self.last_directory = '.'
+        self.last_directory = "."
 
-        ''' The menu bar for holding the themes '''
+        """ The menu bar for holding the themes """
         menubar = tk.Menu(frame)
         frame.configure(menu=menubar)
         theme_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label='Theme', menu=theme_menu)
-        self.default = tk.StringVar(value='Black')
+        menubar.add_cascade(label="Theme", menu=theme_menu)
+        self.default = tk.StringVar(value="Black")
         themes = frame.get_themes()
         sorted_themes = sorted(themes)
 
         for t in sorted_themes:
-            theme_menu.add_radiobutton(label=str.capitalize(t), variable=self.default, value=str.capitalize(t),
-                                       command=lambda: self.change_theme(str.lower(self.default.get())))
+            theme_menu.add_radiobutton(
+                label=str.capitalize(t),
+                variable=self.default,
+                value=str.capitalize(t),
+                command=lambda: self.change_theme(str.lower(self.default.get())),
+            )
 
         def instructions():
-            about_text = '''
+            about_text = """
             Themes menu will change the appearance of gui
             About/Usage will display this dialog
             
@@ -99,37 +103,47 @@ class Creator:
                 (resizes output, result displays in color selected)
               At any stage select 'Clear' to reset
               
-            '''
+            """
             messagebox.showinfo("How To Use", about_text)
 
         about_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label='About', menu=about_menu)
+        menubar.add_cascade(label="About", menu=about_menu)
         about_menu.add_command(label="Usage", command=instructions)
 
-        '''
+        """
         the dictionaries that hold the input/output Rectangle that are created to represent 
         what is seen on the screen
-        '''
-        self.input_cells: dict[str, int] = dict()  # the input rectangles keyed by row:col
-        self.output_cells: dict[str, int] = dict()  # the output rectangles keyed by row:col
+        """
+        self.input_cells: dict[str, int] = (
+            dict()
+        )  # the input rectangles keyed by row:col
+        self.output_cells: dict[str, int] = (
+            dict()
+        )  # the output rectangles keyed by row:col
 
-        self.cell_size: int = 0  # the width/height of an individual Rectangle (i.e. pixel)
+        self.cell_size: int = (
+            0  # the width/height of an individual Rectangle (i.e. pixel)
+        )
 
-        '''
+        """
         arc_data_sets is the backing store for the problem that is loaded in the application.
         this doesn't necessarily match with the data in the current_working_set
-        '''
-        self.arc_data_sets: dict[str, ArcSet] = dict()  # the backing store for the problem that is loaded
+        """
+        self.arc_data_sets: dict[str, ArcSet] = (
+            dict()
+        )  # the backing store for the problem that is loaded
 
-        '''
+        """
         The current_working_set is the data that is visible to the user in both input and output grids
         and doesn't necessarily match with the data in the arc_data_sets.
         
         When this gets changed to a new working set, the data should be written to the corresponding
         arc_data_set so that the backing store stays in sync with any changes made prior to the swap
-        '''
-        self.current_working_set: ArcSet = ArcSet(ArcData(np.zeros((DEFAULT_SIZE, DEFAULT_SIZE))),
-                                                  ArcData(np.zeros((DEFAULT_SIZE, DEFAULT_SIZE))))
+        """
+        self.current_working_set: ArcSet = ArcSet(
+            ArcData(np.zeros((DEFAULT_SIZE, DEFAULT_SIZE))),
+            ArcData(np.zeros((DEFAULT_SIZE, DEFAULT_SIZE))),
+        )
 
         self.current_set_name: str = ""  # the name in the combo box the user can see
         self.normalized_rotation = None  # used to store last known rotation
@@ -139,52 +153,66 @@ class Creator:
         frame.columnconfigure(index=0, weight=1)
         frame.rowconfigure(index=1, weight=1)
 
-        self.ttk_style.configure('Main.TFrame', borderwidth=5, relief='ridge')
-        main_frame = ttk.Frame(frame, style='Main.TFrame')
+        self.ttk_style.configure("Main.TFrame", borderwidth=5, relief="ridge")
+        main_frame = ttk.Frame(frame, style="Main.TFrame")
         main_frame.grid(row=0, column=0, padx=5, pady=5)
 
         # contains all the widgets for manipulating the arc-grids
-        tool_bar = ttk.Frame(main_frame, style='Main.TFrame')
-        tool_bar.grid(row=0, column=0, padx=5, pady=5, sticky='nsew')
+        tool_bar = ttk.Frame(main_frame, style="Main.TFrame")
+        tool_bar.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
 
         # used to add training paris to the input-output set ---------------------------------------
-        info_frame = ttk.Frame(tool_bar, style='Main.TFrame')
+        info_frame = ttk.Frame(tool_bar, style="Main.TFrame")
         info_frame.grid()
 
         btn_add_pair = ttk.Button(info_frame, text="Add IO Pair", command=self.add_pair)
         btn_add_pair.grid(padx=5, pady=5)
-        btn_remove_pair = ttk.Button(info_frame, text="Remove IO Pair", command=self.remove_pair)
+        btn_remove_pair = ttk.Button(
+            info_frame, text="Remove IO Pair", command=self.remove_pair
+        )
         btn_remove_pair.grid(padx=5, pady=5)
-        ''' 
+        """ 
         create the initial data for the combo box
         create a read only combo_box and attach it to the info_frame panel
         set the combo in the third row of the info_panel
         set the currently selected index of the combo box
         set the function to trigger with combo box is changed
-        '''
+        """
         self.options = ["Training 1", "Test"]
-        self.arc_pair_combo = ttk.Combobox(info_frame, values=self.options, state='readonly')
+        self.arc_pair_combo = ttk.Combobox(
+            info_frame, values=self.options, state="readonly"
+        )
         self.arc_pair_combo.grid(padx=5, pady=5)
         self.arc_pair_combo.current(0)
-        self.arc_pair_combo.bind('<<ComboboxSelected>>', self.on_select)
+        self.arc_pair_combo.bind("<<ComboboxSelected>>", self.on_select)
 
         # -------------------------------------------------------------------------------------------
         #  TODO Here we need another tool panel for things like problem reset and/or Panel Reset?
         # -------------------------------------------------------------------------------------------
 
         # panel used to read in and/or write out IO sets
-        read_write_frame = Frame(tool_bar, style='Main.TFrame')
+        read_write_frame = Frame(tool_bar, style="Main.TFrame")
         read_write_frame.grid(row=0, column=2, padx=5, pady=5)
 
-        btn_read_file = ttk.Button(read_write_frame, text='Read File', command=self.read_io_file)
-        btn_read_file.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
-        btn_write_file = ttk.Button(read_write_frame, text='Write File', command=self.write_io_file)
-        btn_write_file.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
-        self.lbl_file_name = ttk.Label(read_write_frame, text='', width=25)
-        self.lbl_file_name.grid(row=3, column=0, sticky='nsew', padx=5, pady=5)
+        btn_read_file = ttk.Button(
+            read_write_frame, text="Read File", command=self.read_io_file
+        )
+        btn_read_file.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        btn_write_file = ttk.Button(
+            read_write_frame, text="Write File", command=self.write_io_file
+        )
+        btn_write_file.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        self.lbl_file_name = ttk.Label(read_write_frame, text="", width=25)
+        self.lbl_file_name.grid(row=3, column=0, sticky="nsew", padx=5, pady=5)
 
         # the color palette that we can select different colors from
-        self.color_pallet = tk.Canvas(tool_bar, width=452, height=47, background="grey25", highlightbackground="grey25")
+        self.color_pallet = tk.Canvas(
+            tool_bar,
+            width=452,
+            height=47,
+            background="grey25",
+            highlightbackground="grey25",
+        )
         self.color_pallet.grid(columnspan=3, padx=5, pady=5)
         self.palette_rects = []
         self.make_color_palette()
@@ -196,52 +224,75 @@ class Creator:
 
         # -------------------------------------------------------------------------------------------
         # panel to control input and output panels for the grid creation
-        input_output_frame = Frame(tool_bar, width=150, height=150, style='Main.TFrame')
-        input_output_frame.grid(row=0, column=3, sticky='nsew', padx=5, pady=5, rowspan=3)
+        input_output_frame = Frame(tool_bar, width=150, height=150, style="Main.TFrame")
+        input_output_frame.grid(
+            row=0, column=3, sticky="nsew", padx=5, pady=5, rowspan=3
+        )
 
         input_grid_info = Frame(input_output_frame, borderwidth=5)
-        input_grid_info.grid(row=0, column=0, sticky='nsew', padx=5, pady=5)
-        lbl_input_grid = ttk.Label(input_grid_info, text='Input Grid Size')
-        lbl_input_grid.grid(row=0, column=0, sticky="nsew", padx=5, pady=5, columnspan=3)
+        input_grid_info.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        lbl_input_grid = ttk.Label(input_grid_info, text="Input Grid Size")
+        lbl_input_grid.grid(
+            row=0, column=0, sticky="nsew", padx=5, pady=5, columnspan=3
+        )
 
         self.entry_input_rows = ttk.Entry(input_grid_info, width=3)
         self.entry_input_rows.grid(row=1, column=0)
         self.entry_input_rows.insert(0, str(DEFAULT_SIZE))
-        lbl_in_x = ttk.Label(input_grid_info, text='X')
+        lbl_in_x = ttk.Label(input_grid_info, text="X")
         lbl_in_x.grid(row=1, column=1)
         self.entry_input_cols = ttk.Entry(input_grid_info, width=3)
         self.entry_input_cols.grid(row=1, column=2)
         self.entry_input_cols.insert(0, str(DEFAULT_SIZE))
-        btn_resize_input = ttk.Button(input_grid_info, text='Resize/Reset', command=lambda: self.resize_grid(INPUT))
-        btn_resize_input.grid(row=2, column=0, padx=5, pady=5, columnspan=3, sticky='nsew')
+        btn_resize_input = ttk.Button(
+            input_grid_info,
+            text="Resize/Reset",
+            command=lambda: self.resize_grid(INPUT),
+        )
+        btn_resize_input.grid(
+            row=2, column=0, padx=5, pady=5, columnspan=3, sticky="nsew"
+        )
 
-        output_grid_info = Frame(input_output_frame, width=150, height=150, borderwidth=5)
+        output_grid_info = Frame(
+            input_output_frame, width=150, height=150, borderwidth=5
+        )
         output_grid_info.grid(row=0, column=1, padx=5, pady=5)
-        lbl_output_grid = ttk.Label(output_grid_info, text='Output Grid Size')
-        lbl_output_grid.grid(row=0, column=0, sticky="nsew", padx=5, pady=5, columnspan=3)
+        lbl_output_grid = ttk.Label(output_grid_info, text="Output Grid Size")
+        lbl_output_grid.grid(
+            row=0, column=0, sticky="nsew", padx=5, pady=5, columnspan=3
+        )
 
         self.entry_output_rows = ttk.Entry(output_grid_info, width=3)
         self.entry_output_rows.grid(row=1, column=0, padx=0, pady=0)
         self.entry_output_rows.insert(0, str(DEFAULT_SIZE))
-        lbl_out_x = ttk.Label(output_grid_info, text='X')
+        lbl_out_x = ttk.Label(output_grid_info, text="X")
         lbl_out_x.grid(row=1, column=1, padx=0, pady=0)
         self.entry_output_cols = ttk.Entry(output_grid_info, width=3)
         self.entry_output_cols.grid(row=1, column=2, padx=0, pady=0)
         self.entry_output_cols.insert(0, str(DEFAULT_SIZE))
-        btn_resize_output = ttk.Button(output_grid_info, text='Resize/Reset', command=lambda: self.resize_grid(OUTPUT))
-        btn_resize_output.grid(row=2, column=0, padx=5, pady=5, columnspan=3, sticky='nsew')
+        btn_resize_output = ttk.Button(
+            output_grid_info,
+            text="Resize/Reset",
+            command=lambda: self.resize_grid(OUTPUT),
+        )
+        btn_resize_output.grid(
+            row=2, column=0, padx=5, pady=5, columnspan=3, sticky="nsew"
+        )
 
-        btn_copy_in_to_out = ttk.Button(input_output_frame, text="Copy Input to Output",
-                                        command=self.copy_input_to_output)
+        btn_copy_in_to_out = ttk.Button(
+            input_output_frame,
+            text="Copy Input to Output",
+            command=self.copy_input_to_output,
+        )
         btn_copy_in_to_out.grid(row=1, column=0, columnspan=2)
 
-        self.error_label = ttk.Label(input_output_frame, text='')
+        self.error_label = ttk.Label(input_output_frame, text="")
         self.error_label.grid(row=2, column=0, columnspan=2)
 
         # -----------------------------------------------------------------------------------------------------------
         # boolean operations panel
 
-        '''
+        """
             The boolean dictionary is used to store the highlighted selections for the operation
             The operation uses 2 unique selections of equal size from the input grid 
               and combines them based on the dropdown selection made, 
@@ -254,46 +305,63 @@ class Creator:
                 ex. [(('0','0'), int), (('1','1'), int)]
                 
             As an aside maybe I just need to store the selection rectangles themselves?
-        '''
+        """
         self.bool_op_dict: dict[int, np.ndarray] = dict()
 
-        boolean_op_panel = Frame(tool_bar, width=150, height=150, style='Main.TFrame')
-        boolean_op_panel.grid(row=0, column=4, sticky='nsew', padx=5, pady=5, rowspan=3)
+        boolean_op_panel = Frame(tool_bar, width=150, height=150, style="Main.TFrame")
+        boolean_op_panel.grid(row=0, column=4, sticky="nsew", padx=5, pady=5, rowspan=3)
 
         lbl_boolean = ttk.Label(boolean_op_panel, text="Boolean Operations")
-        lbl_boolean.grid(row=0, column=0, padx=5, pady=5, columnspan=2, sticky='nsew')
+        lbl_boolean.grid(row=0, column=0, padx=5, pady=5, columnspan=2, sticky="nsew")
 
-        self.bool_options = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR']
-        self.bool_op_combo = ttk.Combobox(boolean_op_panel, values=self.bool_options, state='readonly')
+        self.bool_options = ["AND", "OR", "NAND", "NOR", "XOR", "XNOR"]
+        self.bool_op_combo = ttk.Combobox(
+            boolean_op_panel, values=self.bool_options, state="readonly"
+        )
         self.bool_op_combo.grid(row=1, column=0, padx=5, pady=5, columnspan=2)
         self.bool_op_combo.current(0)
 
-        self.btn_bool_sel_1 = ttk.Button(boolean_op_panel, text='Sel 1', command=lambda: self.bool_selection(1))
+        self.btn_bool_sel_1 = ttk.Button(
+            boolean_op_panel, text="Sel 1", command=lambda: self.bool_selection(1)
+        )
         self.btn_bool_sel_1.grid(row=2, column=0, padx=5, pady=5)
 
-        self.btn_bool_sel_2 = ttk.Button(boolean_op_panel, text='Sel 2',
-                                         command=lambda: self.bool_selection(2), state='disabled')
+        self.btn_bool_sel_2 = ttk.Button(
+            boolean_op_panel,
+            text="Sel 2",
+            command=lambda: self.bool_selection(2),
+            state="disabled",
+        )
         self.btn_bool_sel_2.grid(row=2, column=1, padx=5, pady=5)
 
-        self.btn_bool_execute = ttk.Button(boolean_op_panel, text='Execute',
-                                           command=self.bool_op_execute, state='disabled')
+        self.btn_bool_execute = ttk.Button(
+            boolean_op_panel,
+            text="Execute",
+            command=self.bool_op_execute,
+            state="disabled",
+        )
         self.btn_bool_execute.grid(row=3, column=0, padx=5, pady=5, columnspan=2)
 
-        self.btn_bool_clear = ttk.Button(boolean_op_panel, text='Clear',
-                                         command=self.bool_op_clear, state='disabled')
+        self.btn_bool_clear = ttk.Button(
+            boolean_op_panel, text="Clear", command=self.bool_op_clear, state="disabled"
+        )
         self.btn_bool_clear.grid(row=4, column=0, padx=5, pady=5, columnspan=2)
 
         # -- create the input and output grids ------------------------------------------------------------------
 
-        grid_frame = Frame(main_frame, style='Main.TFrame')
+        grid_frame = Frame(main_frame, style="Main.TFrame")
         grid_frame.grid(row=1, column=0, padx=5, pady=5)
 
-        self.input_grid_canvas = tk.Canvas(grid_frame, background='grey80', name="input_grid")
-        self.input_grid_canvas.grid(row=0, column=0, padx=10, pady=10, sticky='n')
+        self.input_grid_canvas = tk.Canvas(
+            grid_frame, background="grey80", name="input_grid"
+        )
+        self.input_grid_canvas.grid(row=0, column=0, padx=10, pady=10, sticky="n")
         self.input_grid_canvas.bind("<1>", self.input_grid_clicked)
 
-        self.output_grid_canvas = Canvas(grid_frame, background="grey80", name='output_grid')
-        self.output_grid_canvas.grid(row=0, column=2, padx=10, pady=10, sticky='n')
+        self.output_grid_canvas = Canvas(
+            grid_frame, background="grey80", name="output_grid"
+        )
+        self.output_grid_canvas.grid(row=0, column=2, padx=10, pady=10, sticky="n")
         self.output_grid_canvas.bind("<1>", self.output_grid_clicked)
 
         # end of gui creation stuff
@@ -330,7 +398,6 @@ class Creator:
         frame.bind("9", lambda e: self.select_pallet_color(9))
         frame.bind("0", lambda e: self.select_pallet_color(0))
 
-
         # -------------------------------------------------------------------------------------------
         self.copy_queue: list = list()
 
@@ -349,8 +416,12 @@ class Creator:
         self.output_grid_canvas.bind("<Control-B1-Motion>", self.update_select)
         self.output_grid_canvas.bind("<Control-ButtonRelease-1>", self.stop_select)
 
-        self.input_grid_canvas.bind("<B1-Motion>", lambda e: self.clear_highlights("input"))
-        self.output_grid_canvas.bind("<B1-Motion>", lambda e: self.clear_highlights("output"))
+        self.input_grid_canvas.bind(
+            "<B1-Motion>", lambda e: self.clear_highlights("input")
+        )
+        self.output_grid_canvas.bind(
+            "<B1-Motion>", lambda e: self.clear_highlights("output")
+        )
 
         # ---------------- Multiple box select/highlight for copy/paste/delete code --------------------------------
         self.hl_orig_x = 0
@@ -360,11 +431,15 @@ class Creator:
 
         self.input_grid_canvas.bind("<Shift-1>", self.highlight_start_select)
         self.input_grid_canvas.bind("<Shift-B1-Motion>", self.highlight_update_select)
-        self.input_grid_canvas.bind("<Shift-ButtonRelease-1>", self.highlight_stop_select)
+        self.input_grid_canvas.bind(
+            "<Shift-ButtonRelease-1>", self.highlight_stop_select
+        )
 
         self.output_grid_canvas.bind("<Shift-1>", self.highlight_start_select)
         self.output_grid_canvas.bind("<Shift-B1-Motion>", self.highlight_update_select)
-        self.output_grid_canvas.bind("<Shift-ButtonRelease-1>", self.highlight_stop_select)
+        self.output_grid_canvas.bind(
+            "<Shift-ButtonRelease-1>", self.highlight_stop_select
+        )
 
     # --------------- End of Constructor calls ---------------------------------------------------------------
 
@@ -383,11 +458,11 @@ class Creator:
         c_list = [colors.index(x[1]) for x in normalized]
         mat: npt.NDArray = np.asarray(c_list).reshape((r, c))
 
-        if pressed == '9':  # rotate 90 degrees  CCW 3x
+        if pressed == "9":  # rotate 90 degrees  CCW 3x
             r_mat = np.rot90(mat, k=-1)
-        elif pressed == '8':  # rotate 180 degrees  CCW 2x
+        elif pressed == "8":  # rotate 180 degrees  CCW 2x
             r_mat = np.rot90(mat, k=-2)
-        elif pressed == '7':  # rotate 270 degrees  more rightly CCW 90 degrees
+        elif pressed == "7":  # rotate 270 degrees  more rightly CCW 90 degrees
             r_mat = np.rot90(mat)
         else:
             raise Exception(f"Unknown rotation type pressed: {pressed}")
@@ -418,17 +493,18 @@ class Creator:
 
         # set existing selection to unfilled
         for rect in selected:
-            canvas.itemconfig(rect, fill=UNFILLED, outline='')  # remove visual
-            tag = canvas.gettags(rect)[0].split(':')
-            working_set.data()[int(tag[0]), int(tag[1])] = colors.index(UNFILLED)  # remove from data set
+            canvas.itemconfig(rect, fill=UNFILLED, outline="")  # remove visual
+            tag = canvas.gettags(rect)[0].split(":")
+            working_set.data()[int(tag[0]), int(tag[1])] = colors.index(
+                UNFILLED
+            )  # remove from data set
 
         for rect, c_idx in zip(r_selected, r_mat.flatten()):
-            canvas.itemconfig(rect, fill=colors[c_idx], outline='')
-            tag = canvas.gettags(rect)[0].split(':')
+            canvas.itemconfig(rect, fill=colors[c_idx], outline="")
+            tag = canvas.gettags(rect)[0].split(":")
             working_set.data()[int(tag[0]), int(tag[1])] = c_idx
 
         self.highlight_selected(canvas, r_selected)
-
 
     def flip_selection(self, event):
         pressed = event.keysym
@@ -444,20 +520,23 @@ class Creator:
         c += 1
         c_list = [colors.index(x[1]) for x in normalized]
         arr = np.asarray(c_list).reshape((r, c))
-        if pressed == 'h':
+        if pressed == "h":
             flip = np.fliplr(arr)
-        elif pressed == 'v':
+        elif pressed == "v":
             flip = np.flipud(arr)
         else:
             raise Exception(f"Unknown flip type pressed: {pressed}")
 
         grid_type = canvas.winfo_name()
-        working_set = self.current_working_set.get_input_data() if grid_type == 'input_grid' \
+        working_set = (
+            self.current_working_set.get_input_data()
+            if grid_type == "input_grid"
             else (self.current_working_set.get_output_data())
+        )
         flat = flip.flatten()
         for rect, idx in zip(selected, flat):
-            tag = canvas.gettags(rect)[0].split(':')
-            canvas.itemconfig(rect, fill=colors[idx], outline='')
+            tag = canvas.gettags(rect)[0].split(":")
+            canvas.itemconfig(rect, fill=colors[idx], outline="")
             working_set.data()[int(tag[0]), int(tag[1])] = idx
 
         self.highlight_selected(canvas, selected)
@@ -469,21 +548,23 @@ class Creator:
         the selected rectangles and stores just the color and cell location
         in list (i.e. self.copy_queue).
         """
-        '''
+        """
         We don't need to not copy the rectangles but the data they contain 
         i.e. the color they hold and their cell location.
         
         We also need to shift the position of the pseudo array to essentially 0:0
         so a paste of the data can be performed at any location adding the 
         starting row:col to each key to get the corresponding output rectangle
-        '''
+        """
         canvas, selected = self.hl_objects.popitem()
         self.copy_queue.clear()  # clear the previously copied cells
         normalized = self.normalize_selection(canvas, selected)
         self.copy_queue.extend(normalized)
 
     @staticmethod
-    def normalize_selection(canvas: Canvas, selected: list) -> list[tuple[tuple[str, str], str]]:
+    def normalize_selection(
+        canvas: Canvas, selected: list
+    ) -> list[tuple[tuple[str, str], str]]:
         """
         Normalize the list of rectangle coordinates to start at
         a 0:0 grid location that they can be used for varying
@@ -491,12 +572,12 @@ class Creator:
         """
         local = list()
         first_tag = canvas.gettags(selected[0])[0]
-        r, c = first_tag.split(':')
+        r, c = first_tag.split(":")
         sr = int(r)
         sc = int(c)
         for rect in selected:
-            canvas.itemconfig(rect, outline='')
-            fill = canvas.itemcget(rect, 'fill')
+            canvas.itemconfig(rect, outline="")
+            fill = canvas.itemcget(rect, "fill")
             tag = canvas.gettags(rect)[0]
             rect_r, rect_c = tag.split(":")
             row = int(rect_r) - sr
@@ -534,7 +615,9 @@ class Creator:
             return
         if len(self.hl_objects) <= 0:
             return
-        local = deepcopy(self.copy_queue)  # we don't clear because we should be able to paste as many as we want
+        local = deepcopy(
+            self.copy_queue
+        )  # we don't clear because we should be able to paste as many as we want
         canvas, selected = self.hl_objects.popitem()
         self.reset_highlights(canvas, selected)
 
@@ -546,8 +629,8 @@ class Creator:
             working_set = self.current_working_set.get_output_data()
 
         start_cell = canvas.gettags(selected[0])[0]
-        canvas.itemconfig(start_cell, outline='')
-        sr, sc = start_cell.split(':')
+        canvas.itemconfig(start_cell, outline="")
+        sr, sc = start_cell.split(":")
         start_r = int(sr)  # start row
         start_c = int(sc)  # start column
 
@@ -558,10 +641,11 @@ class Creator:
             dest_row = cr + start_r
             dest_col = cc + start_c
             # so here if the copied cell is 0 && keysym == 'p' skip filling the pixel
-            if event.keysym == 'b' and cell[1] == UNFILLED:
+            if event.keysym == "b" and cell[1] == UNFILLED:
                 continue
-            key = f'{dest_row}:{dest_col}'
-            if not grid_set.keys().__contains__(key): continue  # skip if the new data will be written off the grid
+            key = f"{dest_row}:{dest_col}"
+            if not grid_set.keys().__contains__(key):
+                continue  # skip if the new data will be written off the grid
             value = cell[1]
             rect = grid_set[key]
             canvas.itemconfig(rect, fill=value)
@@ -573,7 +657,7 @@ class Creator:
         Clear the highlights from the list of supplied highlights
         """
         for r in highlights:
-            canvas.itemconfig(r, outline='')
+            canvas.itemconfig(r, outline="")
 
     def clear_highlights(self, grid=None):
         """
@@ -584,17 +668,17 @@ class Creator:
         existing colors.
         """
 
-        if grid == 'input':
+        if grid == "input":
             self.clear_hl_box(self.input_grid_canvas)
             return
-        elif grid == 'output':
+        elif grid == "output":
             self.clear_hl_box(self.output_grid_canvas)
             return
 
         while len(self.hl_objects) > 0:
             canvas, selected = self.hl_objects.popitem()
             for r in selected:
-                canvas.itemconfig(r, outline='')
+                canvas.itemconfig(r, outline="")
 
     def clear_hl_box(self, canvas: Canvas):
         canvas.delete(self.hl_box)
@@ -616,21 +700,33 @@ class Creator:
             grid_data = self.current_working_set.get_output_data()
 
         for rect in selected:
-            canvas.itemconfig(rect, fill=UNFILLED, outline='')  # remove visual
-            tag = canvas.gettags(rect)[0].split(':')
-            grid_data.data()[int(tag[0]), int(tag[1])] = colors.index(UNFILLED)  # remove from data set
+            canvas.itemconfig(rect, fill=UNFILLED, outline="")  # remove visual
+            tag = canvas.gettags(rect)[0].split(":")
+            grid_data.data()[int(tag[0]), int(tag[1])] = colors.index(
+                UNFILLED
+            )  # remove from data set
 
     def highlight_start_select(self, event):
         """
         Called when the user Shift+Clicks in a cell.
         Used to highlight 1 or more rectangles.
         """
-        canvas = self.input_grid_canvas if event.widget.winfo_name() == 'input_grid' else self.output_grid_canvas
+        canvas = (
+            self.input_grid_canvas
+            if event.widget.winfo_name() == "input_grid"
+            else self.output_grid_canvas
+        )
         self.hl_orig_x = canvas.canvasx(event.x)
         self.hl_orig_y = canvas.canvasy(event.y)
 
-        self.hl_box = canvas.create_rectangle(self.hl_orig_x, self.hl_orig_y, self.hl_orig_x, self.hl_orig_y,
-                                              outline=OUTLINE, width=2)
+        self.hl_box = canvas.create_rectangle(
+            self.hl_orig_x,
+            self.hl_orig_y,
+            self.hl_orig_x,
+            self.hl_orig_y,
+            outline=OUTLINE,
+            width=2,
+        )
 
     def highlight_update_select(self, event):
         """
@@ -641,17 +737,29 @@ class Creator:
         if self.hl_box is None:
             return
 
-        canvas = self.input_grid_canvas if event.widget.winfo_name() == 'input_grid' else self.output_grid_canvas
+        canvas = (
+            self.input_grid_canvas
+            if event.widget.winfo_name() == "input_grid"
+            else self.output_grid_canvas
+        )
         hl_end_x = canvas.canvasx(event.x)
         hl_end_y = canvas.canvasy(event.y)
         if hl_end_x < self.hl_orig_x and hl_end_y < self.hl_orig_y:
-            canvas.coords(self.hl_box, hl_end_x, hl_end_y, self.hl_orig_x, self.hl_orig_y)
+            canvas.coords(
+                self.hl_box, hl_end_x, hl_end_y, self.hl_orig_x, self.hl_orig_y
+            )
         elif hl_end_x < self.hl_orig_x:
-            canvas.coords(self.hl_box, hl_end_x, self.hl_orig_y, self.hl_orig_x, hl_end_y)
+            canvas.coords(
+                self.hl_box, hl_end_x, self.hl_orig_y, self.hl_orig_x, hl_end_y
+            )
         elif hl_end_y < self.hl_orig_y:
-            canvas.coords(self.hl_box, self.hl_orig_x, hl_end_y, hl_end_x, self.hl_orig_y)
+            canvas.coords(
+                self.hl_box, self.hl_orig_x, hl_end_y, hl_end_x, self.hl_orig_y
+            )
         else:
-            canvas.coords(self.hl_box, self.hl_orig_x, self.hl_orig_y, hl_end_x, hl_end_y)
+            canvas.coords(
+                self.hl_box, self.hl_orig_x, self.hl_orig_y, hl_end_x, hl_end_y
+            )
 
     def highlight_stop_select(self, event):
         """
@@ -663,7 +771,11 @@ class Creator:
         alt = (event.state & 0x8) != 0 or (event.state & 0x80) != 0
         shift = (event.state & 0x1) != 0
 
-        canvas = self.input_grid_canvas if event.widget.winfo_name() == 'input_grid' else self.output_grid_canvas
+        canvas = (
+            self.input_grid_canvas
+            if event.widget.winfo_name() == "input_grid"
+            else self.output_grid_canvas
+        )
 
         x1, y1, x2, y2 = canvas.coords(self.hl_box)
 
@@ -686,7 +798,11 @@ class Creator:
         self.copy_cells(event), and self.paste_cells(self).
         """
         self.clear_highlights()
-        cells = self.input_cells if canvas.winfo_name().__contains__(INPUT) else self.output_cells
+        cells = (
+            self.input_cells
+            if canvas.winfo_name().__contains__(INPUT)
+            else self.output_cells
+        )
 
         selected.sort()
         for s in selected:
@@ -701,12 +817,22 @@ class Creator:
         Used to fill 1 or more rectangles with the same color
          at one time.
         """
-        canvas = self.input_grid_canvas if event.widget.winfo_name() == 'input_grid' else self.output_grid_canvas
+        canvas = (
+            self.input_grid_canvas
+            if event.widget.winfo_name() == "input_grid"
+            else self.output_grid_canvas
+        )
         self.orig_x = canvas.canvasx(event.x)
         self.orig_y = canvas.canvasy(event.y)
 
-        self.select_box = canvas.create_rectangle(self.orig_x, self.orig_y, self.orig_x, self.orig_y,
-                                                  outline='OliveDrab1', width=2)
+        self.select_box = canvas.create_rectangle(
+            self.orig_x,
+            self.orig_y,
+            self.orig_x,
+            self.orig_y,
+            outline="OliveDrab1",
+            width=2,
+        )
 
     def update_select(self, event):
         """
@@ -714,7 +840,11 @@ class Creator:
         This will create a selection rectangle to visually indicate how many
          grid cells are being selected for a color fill.
         """
-        canvas = self.input_grid_canvas if event.widget.winfo_name() == 'input_grid' else self.output_grid_canvas
+        canvas = (
+            self.input_grid_canvas
+            if event.widget.winfo_name() == "input_grid"
+            else self.output_grid_canvas
+        )
 
         end_x = canvas.canvasx(event.x)
         end_y = canvas.canvasy(event.y)
@@ -733,7 +863,11 @@ class Creator:
         This will find all the grid cells located under the selection rectangle that was created, deletes the
         selection rectangle, and calls the self.fill_selected method with the canvas and list of selected cells
         """
-        canvas = self.input_grid_canvas if event.widget.winfo_name() == 'input_grid' else self.output_grid_canvas
+        canvas = (
+            self.input_grid_canvas
+            if event.widget.winfo_name() == "input_grid"
+            else self.output_grid_canvas
+        )
 
         x1, y1, x2, y2 = canvas.coords(self.select_box)
         canvas.delete(self.select_box)
@@ -758,7 +892,7 @@ class Creator:
             key = canvas.gettags(s)[0]
             rect = cells[key]
             canvas.itemconfig(rect, fill=colors[self.color_index])
-            coords = key.split(':')
+            coords = key.split(":")
             row = int(coords[0])
             col = int(coords[1])
             working_set.data()[row, col] = self.color_index
@@ -828,9 +962,9 @@ class Creator:
         Adds a Training IO Pair name to the combo box.
         This does not add any data to the backing store
         """
-        pair_name = f'Training {idx}'
+        pair_name = f"Training {idx}"
         self.options.insert(len(self.options) - 1, pair_name)
-        self.arc_pair_combo['value'] = self.options
+        self.arc_pair_combo["value"] = self.options
         return pair_name
 
     def remove_pair(self):
@@ -844,15 +978,17 @@ class Creator:
 
         value = self.arc_pair_combo.current()  # index position in combo box
         if len(self.options) - 2 == value:
-            first_set_name = 'Training 1'
+            first_set_name = "Training 1"
             self.current_working_set = deepcopy(self.arc_data_sets[first_set_name])
             self.current_set_name = first_set_name
             self.arc_pair_combo.current(0)
             self.arc_pair_combo.event_generate("<<ComboboxSelected>>")
 
         # list is zero index, so we want the second to the last entry (last entry is Test)
-        removed = self.options.pop(len(self.options) - 2)  # remove last training and not test
-        self.arc_pair_combo['value'] = self.options
+        removed = self.options.pop(
+            len(self.options) - 2
+        )  # remove last training and not test
+        self.arc_pair_combo["value"] = self.options
         self.arc_data_sets.pop(removed)
 
     def add_to_backing_store(self, key: str, data_set: ArcSet):
@@ -870,8 +1006,15 @@ class Creator:
         height = 40
         for i in range(len(colors)):
             x, y = pad * (i + 1) + i * width, pad
-            rect = self.color_pallet.create_rectangle(x, y, x + width, y + height,
-                                                      outline="black", fill=colors[i], tags=str(i))
+            rect = self.color_pallet.create_rectangle(
+                x,
+                y,
+                x + width,
+                y + height,
+                outline="black",
+                fill=colors[i],
+                tags=str(i),
+            )
             self.palette_rects.append(rect)
 
     def pallet_clicked(self, event):
@@ -883,22 +1026,27 @@ class Creator:
     def select_pallet_color(self, idx: int):
         """Select the color indexed at i in the colors list and highlights it in the pallet"""
         # remove border from previous selection
-        self.color_pallet.itemconfig(self.palette_rects[self.color_index], outline='black', width=1)
+        self.color_pallet.itemconfig(
+            self.palette_rects[self.color_index], outline="black", width=1
+        )
 
         # set the new index & put a border around the selection
         self.color_index = idx
-        self.color_pallet.itemconfig(self.palette_rects[self.color_index], outline='white', width=2)
+        self.color_pallet.itemconfig(
+            self.palette_rects[self.color_index], outline="white", width=2
+        )
 
     def read_io_file(self):
-        file_path = filedialog.askopenfilename(parent=root, initialdir=self.last_directory,
-                                               filetypes=[('JSON,', '*.json')])
+        file_path = filedialog.askopenfilename(
+            parent=root, initialdir=self.last_directory, filetypes=[("JSON,", "*.json")]
+        )
         if not file_path:
             return
 
         self.last_directory = os.path.dirname(file_path)
         file_name = os.path.basename(file_path)
 
-        self.lbl_file_name['text'] = file_name
+        self.lbl_file_name["text"] = file_name
 
         # clear out all the old stuff
         self.arc_data_sets.clear()
@@ -907,23 +1055,23 @@ class Creator:
         self.output_cells.clear()
         self.clear_highlights()
         self.current_working_set = None
-        self.input_grid_canvas.delete('all')
-        self.output_grid_canvas.delete('all')
-        self.arc_pair_combo['values'] = list()
+        self.input_grid_canvas.delete("all")
+        self.output_grid_canvas.delete("all")
+        self.arc_pair_combo["values"] = list()
 
         with open(os.path.join(file_path)) as p:
             flat_data: dict[str, dict] = json.load(p)
             trn_data: list[ArcSet] = list()
-            for dt in flat_data['train']:
-                d_input = ArcData(np.array(dt['input']))
-                d_output = ArcData(np.array(dt['output']))
+            for dt in flat_data["train"]:
+                d_input = ArcData(np.array(dt["input"]))
+                d_output = ArcData(np.array(dt["output"]))
                 trn_set: ArcSet = ArcSet(arc_input=d_input, arc_output=d_output)
                 trn_data.append(trn_set)
 
             tst_data: list[ArcSet] = list()
-            for tst in flat_data['test']:
-                t_input = ArcData(np.array(tst['input']))
-                t_output = ArcData(np.array(tst['output']))
+            for tst in flat_data["test"]:
+                t_input = ArcData(np.array(tst["input"]))
+                t_output = ArcData(np.array(tst["output"]))
                 tst_set: ArcSet = ArcSet(arc_input=t_input, arc_output=t_output)
                 tst_data.append(tst_set)
 
@@ -932,13 +1080,13 @@ class Creator:
                 self.options.append(key)
                 self.add_to_backing_store(key, training_set)
 
-            key = 'Test'
+            key = "Test"
             self.options.append(key)
             self.add_to_backing_store(key, tst_data[0])
 
-            self.arc_pair_combo['value'] = self.options
+            self.arc_pair_combo["value"] = self.options
 
-            first_set_name = 'Training 1'
+            first_set_name = "Training 1"
             self.current_working_set = deepcopy(self.arc_data_sets[first_set_name])
             self.current_set_name = first_set_name
             self.arc_pair_combo.current(0)
@@ -960,26 +1108,31 @@ class Creator:
                 test_data.append(self.arc_data_sets[key].to_dict())
 
         flat_data = dict()
-        flat_data['train'] = train_data
-        flat_data['test'] = test_data
+        flat_data["train"] = train_data
+        flat_data["test"] = test_data
         data_str = json.dumps(flat_data)
 
-        uid = uuid.uuid3(uuid.NAMESPACE_OID, data_str).__str__().split('-')[0]
+        uid = uuid.uuid3(uuid.NAMESPACE_OID, data_str).__str__().split("-")[0]
 
-        file_path = filedialog.asksaveasfilename(parent=root, defaultextension='.json', initialfile=str(uid),
-                                                 initialdir=self.last_directory, filetypes=[('JSON,', '*.json')])
+        file_path = filedialog.asksaveasfilename(
+            parent=root,
+            defaultextension=".json",
+            initialfile=str(uid),
+            initialdir=self.last_directory,
+            filetypes=[("JSON,", "*.json")],
+        )
         if not file_path:
             return
 
         file_name = os.path.basename(file_path)
         self.last_directory = os.path.dirname(file_path)
-        self.lbl_file_name['text'] = file_name
+        self.lbl_file_name["text"] = file_name
         if file_path:
             try:
                 with open(file_path, "w") as file:
                     file.write(data_str)
             except Exception as e:
-                print(f'Error writing file: {str(e)}')
+                print(f"Error writing file: {str(e)}")
 
     def input_grid_clicked(self, event):
         """
@@ -1034,7 +1187,7 @@ class Creator:
             grid = self.output_grid_canvas
             data = self.current_working_set.get_output_data().data()
         else:
-            print(f'Unknown grid type passed to fill cells: {grid_type}')
+            print(f"Unknown grid type passed to fill cells: {grid_type}")
             return
 
         rect: int = cells[key]
@@ -1043,7 +1196,7 @@ class Creator:
         # NOTE this is using a creator version of the ArcData that
         #  we can write to since the real ArcData does a deepcopy
         #  of the internal data
-        keys = key.split(':')
+        keys = key.split(":")
         row = int(keys[0])
         col = int(keys[1])
         data[row, col] = self.color_index
@@ -1059,18 +1212,17 @@ class Creator:
             cells = self.output_cells
             grid = self.output_grid_canvas
         else:
-            print(f'Unknown grid type passed to fill grid method: {grid_type}')
+            print(f"Unknown grid type passed to fill grid method: {grid_type}")
             return
 
         for key in cells.keys():
-            keys = key.split(':')
+            keys = key.split(":")
             row = int(keys[0])
             col = int(keys[1])
             rect: int = cells[key]
-            grid.itemconfig(rect, fill=colors[data[row, col]], outline='')
+            grid.itemconfig(rect, fill=colors[data[row, col]], outline="")
 
     def resize_grid(self, grid_type: str):
-
         """
         Called when someone smashes the Resize button in the toolbar for the Output Grid Size
         or Called when the IOPair combo box is changed to a new ArcSet
@@ -1091,31 +1243,31 @@ class Creator:
             cells: dict[str, int] = self.output_cells
             current_data = self.current_working_set.get_output_data()
         else:
-            print(f'Unknown grid type passed to resize grid: {grid_type}')
+            print(f"Unknown grid type passed to resize grid: {grid_type}")
             return
 
         try:
             rows = int(entry_rows.get())
         except ValueError:
             # not a number
-            self.error_label['text'] = f'row {grid_type} is not a number (1-30)'
+            self.error_label["text"] = f"row {grid_type} is not a number (1-30)"
             return
 
         try:
             columns = int(entry_cols.get())
         except ValueError:
             # not a number
-            self.error_label['text'] = f'column {grid_type} is not a number (1-30)'
+            self.error_label["text"] = f"column {grid_type} is not a number (1-30)"
             return
 
         if rows < 1 or rows > 30:
-            self.error_label['text'] = f'{grid_type} rows must be between 1 and 30'
+            self.error_label["text"] = f"{grid_type} rows must be between 1 and 30"
             return
         if columns < 1 or columns > 30:
-            self.error_label['text'] = f'{grid_type} columns must be between 1 and 30'
+            self.error_label["text"] = f"{grid_type} columns must be between 1 and 30"
             return
 
-        self.error_label['text'] = ''
+        self.error_label["text"] = ""
         cells.clear()
         current_data.reset_data(np.zeros((rows, columns), dtype=int))
         self.make_grid(rows, columns, grid_type)
@@ -1133,7 +1285,7 @@ class Creator:
             grid = self.output_grid_canvas
             cells = self.output_cells
         else:
-            print(f'Unknown Type passed to resize grid: {grid_type}')
+            print(f"Unknown Type passed to resize grid: {grid_type}")
             return
 
         # determine the size of our blocks, this depends on the max of rows and columns
@@ -1147,14 +1299,28 @@ class Creator:
 
         self.cell_size = cell_size
         pad = 4
-        grid.delete('all')
+        grid.delete("all")
         cells.clear()
         for row in range(rows):
             for col in range(columns):
                 x_pad, y_pad = pad * (col + 1), pad * (row + 1)
-                x, y, = x_pad + col * cell_size, y_pad + row * cell_size
-                key = f'{row}:{col}'
-                rect = grid.create_rectangle(x, y, x + cell_size, y + cell_size, fill=UNFILLED, tags=key, outline='')
+                (
+                    x,
+                    y,
+                ) = (
+                    x_pad + col * cell_size,
+                    y_pad + row * cell_size,
+                )
+                key = f"{row}:{col}"
+                rect = grid.create_rectangle(
+                    x,
+                    y,
+                    x + cell_size,
+                    y + cell_size,
+                    fill=UNFILLED,
+                    tags=key,
+                    outline="",
+                )
                 cells[key] = rect
 
         row_height = cell_size * rows + (rows * 4)
@@ -1187,7 +1353,7 @@ class Creator:
         cols = int(self.entry_output_cols.get())
         test_out = self.create_arc_data(rows, cols)
         test = ArcSet(test_in, test_out)
-        self.arc_data_sets['Test'] = test
+        self.arc_data_sets["Test"] = test
 
     @staticmethod
     def create_arc_data(rows: int, cols: int) -> ArcData:
@@ -1206,7 +1372,7 @@ class Creator:
         input_data = self.current_working_set.get_input_data().data()
         self.current_working_set.get_output_data().reset_data(deepcopy(input_data))
 
-        self.output_grid_canvas.delete('all')
+        self.output_grid_canvas.delete("all")
         self.output_cells.clear()
 
         # resize the output grid to match the input grid
@@ -1218,7 +1384,8 @@ class Creator:
         self.resize_grid(OUTPUT)
         self.update_grid(self.current_working_set.get_input_data().data(), OUTPUT)
         self.current_working_set.get_output_data().reset_data(
-            deepcopy(self.current_working_set.get_input_data().data()))
+            deepcopy(self.current_working_set.get_input_data().data())
+        )
 
     def update_grid(self, data: np.ndarray, grid_type: str):
         """
@@ -1247,7 +1414,9 @@ class Creator:
                 rect: int = self.output_cells[key]
                 self.output_grid_canvas.itemconfig(rect, fill=colors[col_idx])
         else:
-            print(f'Update Grid unknown type. Expected {INPUT}/{OUTPUT} but got {grid_type} instead')
+            print(
+                f"Update Grid unknown type. Expected {INPUT}/{OUTPUT} but got {grid_type} instead"
+            )
 
     def bool_selection(self, selection_number: int):
         """
@@ -1261,51 +1430,65 @@ class Creator:
 
         # we only perform operations on the input grid
         if canvas.winfo_name().__contains__(OUTPUT):
-            '''
+            """
             display error dialog, reset highlights, reset selections (empties bool dict and reset buttons)
-            '''
-            messagebox.showerror("Selection Error",
-                                 "Boolean selection can only be made from the input grid!"
-                                 "\n\nMake a new selection.")
+            """
+            messagebox.showerror(
+                "Selection Error",
+                "Boolean selection can only be made from the input grid!"
+                "\n\nMake a new selection.",
+            )
             for r in selected:
-                canvas.itemconfig(r, outline='')
+                canvas.itemconfig(r, outline="")
             return
 
         normalized = self.normalize_selection(canvas, selected)
         array = self.selection_to_array(normalized)
 
         if selection_number == 2:
-            '''
+            """
             check that current selection size is the same as the first
             if it is not, display error message with correct size and just return so we can try again
-            '''
+            """
             first_selection = self.bool_op_dict[1]
             if first_selection.shape != array.shape:
-                messagebox.showerror("Selection Error",
-                                     f"Current selection size {array.shape} is not the same size "
-                                     f"as the first selection {first_selection.shape}\n\n"
-                                     f"Make a new selection")
+                messagebox.showerror(
+                    "Selection Error",
+                    f"Current selection size {array.shape} is not the same size "
+                    f"as the first selection {first_selection.shape}\n\n"
+                    f"Make a new selection",
+                )
                 return
 
         self.bool_op_dict[selection_number] = array
 
         # set the gui button options based on the section number
         if selection_number == 1:
-            self.btn_bool_sel_1.state(['disabled'])  # disable the current button
-            self.bool_op_combo.state(['disabled'])
-            self.btn_bool_sel_2.state(['!disabled'])  # enable both the second selection button
-            self.btn_bool_clear.state(['!disabled'])  # and the clear button (so we can reset)
+            self.btn_bool_sel_1.state(["disabled"])  # disable the current button
+            self.bool_op_combo.state(["disabled"])
+            self.btn_bool_sel_2.state(
+                ["!disabled"]
+            )  # enable both the second selection button
+            self.btn_bool_clear.state(
+                ["!disabled"]
+            )  # and the clear button (so we can reset)
         elif selection_number == 2:
-            self.btn_bool_sel_2.state(['disabled'])  # disable the second selection button (1st btn is disabled)
-            self.btn_bool_execute.state(['!disabled'])  # since we made it here enable the Execute button
+            self.btn_bool_sel_2.state(
+                ["disabled"]
+            )  # disable the second selection button (1st btn is disabled)
+            self.btn_bool_execute.state(
+                ["!disabled"]
+            )  # since we made it here enable the Execute button
 
     def bool_op_execute(self):
         """
         Verify that Sel1, Sel2 have all been selected before executing
         """
         if len(self.bool_op_dict) != 2:
-            messagebox.showerror("Boolean Operation Error",
-                                 "There must be exactly 2 selections made for the Boolean Operation to work.")
+            messagebox.showerror(
+                "Boolean Operation Error",
+                "There must be exactly 2 selections made for the Boolean Operation to work.",
+            )
             return
 
         bool_op_1: np.ndarray = self.bool_op_dict[1]
@@ -1317,16 +1500,18 @@ class Creator:
                 mask: np.ndarray = np.logical_and(bool_op_1, bool_op_2)
             case "OR":
                 mask: np.ndarray = np.logical_or(bool_op_1, bool_op_2)
-            case 'NAND':
+            case "NAND":
                 mask: np.ndarray = np.logical_not(np.logical_and(bool_op_1, bool_op_2))
-            case 'NOR':
+            case "NOR":
                 mask: np.ndarray = np.logical_not(np.logical_or(bool_op_1, bool_op_2))
-            case 'XOR':
+            case "XOR":
                 mask: np.ndarray = np.logical_xor(bool_op_1, bool_op_2)
-            case 'XNOR':
+            case "XNOR":
                 mask: np.ndarray = ~np.bitwise_xor(bool_op_1, bool_op_2)
             case _:
-                messagebox.showerror(f"Unknown boolean option: {bool_type}: clearing operation.")
+                messagebox.showerror(
+                    f"Unknown boolean option: {bool_type}: clearing operation."
+                )
                 self.bool_op_clear()
                 return
 
@@ -1338,7 +1523,7 @@ class Creator:
 
         self.current_working_set.get_output_data().reset_data(deepcopy(output_data))
 
-        self.output_grid_canvas.delete('all')
+        self.output_grid_canvas.delete("all")
         self.output_cells.clear()
 
         # resize the output grid to match the input grid
@@ -1354,17 +1539,17 @@ class Creator:
         self.bool_op_clear()
 
     def bool_op_clear(self):
-        self.bool_op_combo.state(['!disabled'])
-        self.btn_bool_sel_1.state(['!disabled'])
-        self.btn_bool_sel_2.state(['disabled'])
-        self.btn_bool_execute.state(['disabled'])
-        self.btn_bool_clear.state(['disabled'])
+        self.bool_op_combo.state(["!disabled"])
+        self.btn_bool_sel_1.state(["!disabled"])
+        self.btn_bool_sel_2.state(["disabled"])
+        self.btn_bool_execute.state(["disabled"])
+        self.btn_bool_clear.state(["disabled"])
         self.bool_op_dict.clear()
         self.clear_highlights()
 
     def change_theme(self, param: str):
         self.ttk_style.theme_use(param)
-        background = self.ttk_style.lookup('Main.TFrane', 'background')
+        background = self.ttk_style.lookup("Main.TFrane", "background")
         self.color_pallet.configure(bg=background)
 
 
@@ -1374,13 +1559,13 @@ def enterButtonPressed(event):
         widget.invoke()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     root = ttkthemes.ThemedTk()
     root.title("AGI Input/Output Problem Creator")
-    root.set_theme('black')
+    root.set_theme("black")
 
-    root.bind('<Return>', enterButtonPressed)
+    root.bind("<Return>", enterButtonPressed)
     root.resizable(False, False)
     creator = Creator(root)
-    creator.default.set('Black')
+    creator.default.set("Black")
     root.mainloop()

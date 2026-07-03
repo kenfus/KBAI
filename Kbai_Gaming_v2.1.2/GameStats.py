@@ -12,8 +12,17 @@ class GameStats:
     the final game board and the lists of players moves (1 for each active agent).
     """
 
-    def __init__(self, name: str, status: Status, up_first: str, game_time: float,
-                 game: Game, player_moves: List[tuple[int, str]], opp_moves: List[tuple[int, str]], alt_opp_moves=None):
+    def __init__(
+        self,
+        name: str,
+        status: Status,
+        up_first: str,
+        game_time: float,
+        game: Game,
+        player_moves: List[tuple[int, str]],
+        opp_moves: List[tuple[int, str]],
+        alt_opp_moves=None,
+    ):
         self._game_name: str = name
         self._status = status
         self._starter = up_first

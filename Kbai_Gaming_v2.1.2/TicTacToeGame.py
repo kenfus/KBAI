@@ -39,7 +39,7 @@ def is_valid_position(board: np.ndarray, row: int, column: int):
     :return: true if and only if the row and column has no player token associated with it; false otherwise
     """
     try:
-        return np.isin(str(''), board[row][column])
+        return np.isin(str(""), board[row][column])
     except IndexError:
         return False
 
@@ -71,20 +71,36 @@ def winning_move(board: np.ndarray, token: Token) -> bool:
     """
     # check horizontal
     for r in range(3):
-        if board[r][0] == token.value() and board[r][1] == token.value() and board[r][2] == token.value():
+        if (
+            board[r][0] == token.value()
+            and board[r][1] == token.value()
+            and board[r][2] == token.value()
+        ):
             return True
 
     # check vertical
     for c in range(3):
-        if board[0][c] == token.value() and board[1][c] == token.value() and board[2][c] == token.value():
+        if (
+            board[0][c] == token.value()
+            and board[1][c] == token.value()
+            and board[2][c] == token.value()
+        ):
             return True
 
     # check positive slope diagonals
-    if board[0][0] == token.value() and board[1][1] == token.value() and board[2][2] == token.value():
+    if (
+        board[0][0] == token.value()
+        and board[1][1] == token.value()
+        and board[2][2] == token.value()
+    ):
         return True
 
     # check negative slope diagonals
-    if board[2][0] == token.value() and board[1][1] == token.value() and board[0][2] == token.value():
+    if (
+        board[2][0] == token.value()
+        and board[1][1] == token.value()
+        and board[0][2] == token.value()
+    ):
         return True
 
     return False
@@ -92,11 +108,11 @@ def winning_move(board: np.ndarray, token: Token) -> bool:
 
 def make_random_move(board: np.ndarray):
     """
-        Returns a random move from available positions from the provided board
-        :param board: the board from which to evaluate the empty coordinates
-        :return: the set of coordinates in row, column order
-        """
-    empty_coord = np.argwhere(board == '')
+    Returns a random move from available positions from the provided board
+    :param board: the board from which to evaluate the empty coordinates
+    :return: the set of coordinates in row, column order
+    """
+    empty_coord = np.argwhere(board == "")
     idx = np.random.randint(len(empty_coord))
     return empty_coord[idx]
 
@@ -114,13 +130,17 @@ class TicTacToeGame:
         returns game stats
         """
         players_token = player1.token()
-        opp_token = Token('O') if player2 is None else player2.token()
+        opp_token = Token("O") if player2 is None else player2.token()
 
         game = Game(Type.TIC_TAC_TOE, create_board(), 3, 2, players_token, opp_token)
         game_over = False
         turn = randint(0, 1)  # randomly selects who goes first
 
-        first_player = f'Player({players_token.value()})' if turn == 0 else f'Opponent({opp_token.value()})'
+        first_player = (
+            f"Player({players_token.value()})"
+            if turn == 0
+            else f"Opponent({opp_token.value()})"
+        )
         player1_moves = list()
         player2_moves = list()
         game_status = None
@@ -152,7 +172,11 @@ class TicTacToeGame:
                     game_over = True
 
             else:  # Player 2 input
-                row, col = make_random_move(board) if player2 is None else player2.make_move(game)
+                row, col = (
+                    make_random_move(board)
+                    if player2 is None
+                    else player2.make_move(game)
+                )
 
                 if row == -1 and col == -1:
                     row, col = make_random_move(game.get_board())
@@ -176,4 +200,12 @@ class TicTacToeGame:
 
         end_time = time.time()
         game_time = end_time - start_time
-        return GameStats('Tic-Tac-Toe', game_status, first_player, game_time, game, player1_moves, player2_moves)
+        return GameStats(
+            "Tic-Tac-Toe",
+            game_status,
+            first_player,
+            game_time,
+            game,
+            player1_moves,
+            player2_moves,
+        )

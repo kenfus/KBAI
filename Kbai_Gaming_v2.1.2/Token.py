@@ -3,6 +3,7 @@ class Token:
     A general classification for a player's token for participation in a game that designates
     the agents placeholder on the playing field.
     """
+
     def __init__(self, value: str):
         self._value = value.upper()
 
