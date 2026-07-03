@@ -409,6 +409,125 @@ def _overlay_3_sections(a):
     return out
 
 
+def _d_expand_row_to_diagonal_waves(a):
+    # solves c1990cce
+    non_black = a[a != 0]
+    color = non_black[0]
+
+    n = a.shape[1]
+    middle_spots = np.argwhere(a[0] != 0)
+    middle = middle_spots[0][0]
+
+    out = np.zeros((n, n))
+    for r in range(n):
+        for c in range(n):
+            if abs(c - middle) == r:
+                out[r, c] = color
+
+            elif r >= 3:
+                left_edge = middle - r
+                right_edge = middle + r
+                starts_on_right_spot = (c - (middle + r - 4)) % 4 == 0
+                if left_edge <= c <= right_edge and starts_on_right_spot:
+                    out[r, c] = 1
+
+    return out
+
+
+def _d_3x3_rotate_tile(a):
+    # solves c48954c1
+    a = a.copy()
+    upside_down = np.flipud(a)
+    backwards = np.fliplr(a)
+    turned = np.rot90(a, 2)
+    return np.block(
+        [
+            [turned, upside_down, turned],
+            [backwards, a, backwards],
+            [turned, upside_down, turned],
+        ]
+    )
+
+
+def _d_xor_top_bottom_to_six(a):
+    # solves 31d5ba1a
+    top = a[:3]
+    bottom = a[3:]
+
+    top_has_color = top != 0
+    bottom_has_color = bottom != 0
+
+    only_top = top_has_color & (bottom == 0)
+    only_bottom = (top == 0) & bottom_has_color
+    one_side_only = only_top | only_bottom
+
+    conditions = [one_side_only]
+    choices = [6]
+    out = np.select(conditions, choices, default=0)
+    return out
+
+
+def _d_or_left_right_to_one(a):
+    # solves 195ba7dc
+    sep_cols = np.where(np.all(a == 2, axis=0))[0]
+    sep = sep_cols[0]
+
+    left = a[:, :sep]
+    right = a[:, sep + 1 :]
+
+    left_has_color = left != 0
+    right_has_color = right != 0
+    anything = left_has_color | right_has_color
+
+    conditions = [anything]
+    choices = [1]
+    out = np.select(conditions, choices, default=0)
+    return out
+
+
+def _d_count_dots_inside_box(a):
+    # solves c8b7cc0f
+    wall = 1
+    dot_colors = [v for v in np.unique(a) if v not in (0, wall)]
+    dot_color = dot_colors[0]
+
+    rows, cols = np.where(a == wall)
+    r0, r1 = rows.min(), rows.max()
+    c0, c1 = cols.min(), cols.max()
+    inside = a[r0 + 1 : r1, c0 + 1 : c1]
+
+    dot_mask = inside == dot_color
+    dot_spots = np.argwhere(dot_mask)
+    n_dots = len(dot_spots)
+
+    rr, cc = np.indices((3, 3))
+    order = rr * 3 + cc
+    enough_dots = order < n_dots
+
+    conditions = [enough_dots]
+    choices = [dot_color]
+    out = np.select(conditions, choices, default=0)
+    return out
+
+
+def _d_overlay_if_fits_holes(a):
+    # solves bbb1b8b6
+    sep = np.where(np.all(a == 5, axis=0))[0][0]
+    left = a[:, :sep]
+    right = a[:, sep + 1 :]
+
+    right_is_empty = right == 0
+    left_is_empty = left == 0
+    right_fits_holes = np.all(right_is_empty | left_is_empty)
+
+    right_has_color = right != 0
+    overlay = np.select([right_has_color], [right], default=left)
+
+    if right_fits_holes:
+        return overlay
+    return left
+
+
 def _candidates():
     return [
         _cutout_recolor_largest_block_outside_color,
@@ -421,6 +540,17 @@ def _candidates():
         _transpose,
         _overlay_3_sections,
     ]
+
+
+def _d_candidates():
+    return [
+        _d_expand_row_to_diagonal_waves,
+        _d_3x3_rotate_tile,
+        _d_xor_top_bottom_to_six,
+        _d_or_left_right_to_one,
+        _d_count_dots_inside_box,
+        _d_overlay_if_fits_holes,
+    ] + _candidates()
 
 
 def solve_milestone_B_dumb(training_sets, test_grid):
@@ -454,7 +584,7 @@ def solve_milestone_D_dumb(training_sets, test_grid):
     ]
     test = np.asarray(test_grid)
 
-    for transform in _candidates():
+    for transform in _d_candidates():
         try:
             works = True
             for inp, out in train:
