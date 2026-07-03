@@ -10,7 +10,7 @@ def test():
     print(test_agent.solve(2, 2))
     print(test_agent.solve(3, 3))
     print(test_agent.solve(5, 3))
-    print(test_agent.solve(6, 3))
+    print(test_agent.solve(6, 6))
     print(test_agent.solve(7, 3))
     print(test_agent.solve(5, 5))
     print(test_agent.solve(5, 6))

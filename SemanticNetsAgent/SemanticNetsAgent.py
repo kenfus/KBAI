@@ -108,3 +108,5 @@ class SemanticNetsAgent:
                     visited.add(new_state)
                     queue.append((new_state, path + [move]))
 
+        return []
+
