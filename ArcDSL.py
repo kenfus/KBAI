@@ -409,27 +409,47 @@ def _overlay_3_sections(a):
     return out
 
 
+def _count_square_colors(a):
+    # solves 81c0276b
+    color, counts = np.unique(a[a != 0], return_counts=True)
+    most_common_color = color[np.argmax(counts)]
+    other_colors, other_colors_count = color[color != most_common_color], counts[color != most_common_color]
+    out = np.zeros((np.max(other_colors_count), len(other_colors_count)))
+    for col in range(out.shape[1]):
+        for row in range(other_colors_count[col]):
+            out[row, col] = other_colors[col]
+
+    return out
+
+
 def _d_expand_row_to_diagonal_waves(a):
     # solves c1990cce
     non_black = a[a != 0]
+    n = a.shape[1]
+    out = np.zeros((n, n))
     color = non_black[0]
 
-    n = a.shape[1]
-    middle_spots = np.argwhere(a[0] != 0)
-    middle = middle_spots[0][0]
+    middle_spots = np.argwhere(a != 0)
+    middle = middle_spots[0][1]
 
-    out = np.zeros((n, n))
     for r in range(n):
         for c in range(n):
             if abs(c - middle) == r:
                 out[r, c] = color
 
-            elif r >= 3:
-                left_edge = middle - r
-                right_edge = middle + r
-                starts_on_right_spot = (c - (middle + r - 4)) % 4 == 0
-                if left_edge <= c <= right_edge and starts_on_right_spot:
-                    out[r, c] = 1
+    first_blue_row = np.zeros(4)
+    first_blue_row[(middle - 1) % 4] = 1
+
+    for r in range(3, n):
+        blue_row = np.roll(first_blue_row, (r - 3) % 4)
+        blue_row = np.tile(blue_row, n)[:n]
+        left_edge = middle - r
+        right_edge = middle + r
+        for c in range(n):
+            if blue_row[c] == 1:
+                if left_edge <= c <= right_edge:
+                    if out[r, c] == 0:
+                        out[r, c] = 1
 
     return out
 
@@ -457,17 +477,17 @@ def _d_xor_top_bottom_to_six(a):
     top_has_color = top != 0
     bottom_has_color = bottom != 0
 
-    only_top = top_has_color & (bottom == 0)
-    only_bottom = (top == 0) & bottom_has_color
-    one_side_only = only_top | only_bottom
+    x_or = np.logical_xor(top_has_color, bottom_has_color)
 
-    conditions = [one_side_only]
-    choices = [6]
-    out = np.select(conditions, choices, default=0)
+    out = x_or * 6 # So it's lila
     return out
 
 
-def _d_or_left_right_to_one(a):
+def _fill_with_common_cell_color(a):
+    # solves 4b6b68e5
+    pass
+
+def _or(a):
     # solves 195ba7dc
     sep_cols = np.where(np.all(a == 2, axis=0))[0]
     sep = sep_cols[0]
@@ -477,37 +497,35 @@ def _d_or_left_right_to_one(a):
 
     left_has_color = left != 0
     right_has_color = right != 0
-    anything = left_has_color | right_has_color
+    x_or = np.logical_or(left_has_color, right_has_color)
 
-    conditions = [anything]
-    choices = [1]
-    out = np.select(conditions, choices, default=0)
+    out = x_or * 1 # So it's int
     return out
 
 
 def _d_count_dots_inside_box(a):
     # solves c8b7cc0f
     wall = 1
-    dot_colors = [v for v in np.unique(a) if v not in (0, wall)]
-    dot_color = dot_colors[0]
 
     rows, cols = np.where(a == wall)
     r0, r1 = rows.min(), rows.max()
     c0, c1 = cols.min(), cols.max()
     inside = a[r0 + 1 : r1, c0 + 1 : c1]
+    dot_color, n_dots = np.unique(inside[inside != 0], return_counts=True)
 
     dot_mask = inside == dot_color
     dot_spots = np.argwhere(dot_mask)
     n_dots = len(dot_spots)
 
-    rr, cc = np.indices((3, 3))
-    order = rr * 3 + cc
-    enough_dots = order < n_dots
+    out = np.zeros((3,3))
+    dots_added = 0
 
-    conditions = [enough_dots]
-    choices = [dot_color]
-    out = np.select(conditions, choices, default=0)
-    return out
+    for r in range(3):
+        for c in range(3):
+            out[r, c] = dot_color
+            dots_added += 1
+            if dots_added == n_dots:
+                return out
 
 
 def _d_overlay_if_fits_holes(a):
@@ -516,16 +534,58 @@ def _d_overlay_if_fits_holes(a):
     left = a[:, :sep]
     right = a[:, sep + 1 :]
 
-    right_is_empty = right == 0
-    left_is_empty = left == 0
-    right_fits_holes = np.all(right_is_empty | left_is_empty)
+    colors = np.unique(a)
+    colors = [c for c in colors if c != 0 and c != 5]
 
-    right_has_color = right != 0
-    overlay = np.select([right_has_color], [right], default=left)
+    overlay = left + right
 
-    if right_fits_holes:
+    if np.all(np.isin(overlay, colors)):
         return overlay
-    return left
+    else:
+        return left
+
+def _d_connect_stars(a):
+    # solves 60a26a3e
+    out = a.copy()
+    red = 2
+
+    star_filter = np.array(
+        [
+            [0, -2, 0],
+            [-2, 0, -2],
+            [0, -2, 0],
+        ]
+    )
+
+    centers = []
+    windows = np.lib.stride_tricks.sliding_window_view(a, (3, 3))
+    for r in range(windows.shape[0]):
+        for c in range(windows.shape[1]):
+            window = windows[r, c]
+            check = window + star_filter
+            if np.sum(np.abs(check)) == 0:
+                centers.append((r + 1, c + 1))
+
+    center_set = set(centers)
+    for r in range(a.shape[0]):
+        for c in range(a.shape[1]):
+            if out[r, c] != 0 or (r, c) in center_set:
+                continue
+            for r1, c1 in centers:
+                for r2, c2 in centers:
+                    same_row = r1 == r2 and r == r1
+                    between_cols = c1 < c < c2 or c2 < c < c1
+
+                    same_col = c1 == c2 and c == c1
+                    between_rows = r1 < r < r2 or r2 < r < r1
+
+                    if same_row and between_cols:
+                        out[r, c] = 1
+
+                    if same_col and between_rows:
+                        out[r, c] = 1
+
+    return out
 
 
 def _candidates():
@@ -547,9 +607,11 @@ def _d_candidates():
         _d_expand_row_to_diagonal_waves,
         _d_3x3_rotate_tile,
         _d_xor_top_bottom_to_six,
-        _d_or_left_right_to_one,
+        _or,
         _d_count_dots_inside_box,
         _d_overlay_if_fits_holes,
+        _d_connect_stars,
+        _count_square_colors
     ] + _candidates()
 
 
