@@ -489,11 +489,10 @@ def _fill_with_common_cell_color(a):
 
 def _or(a):
     # solves 195ba7dc
-    sep_cols = np.where(np.all(a == 2, axis=0))[0]
-    sep = sep_cols[0]
+    sep_cols = a.shape[1] // 2
 
-    left = a[:, :sep]
-    right = a[:, sep + 1 :]
+    left = a[:, :sep_cols]
+    right = a[:, sep_cols + 1 :]
 
     left_has_color = left != 0
     right_has_color = right != 0
@@ -530,12 +529,12 @@ def _d_count_dots_inside_box(a):
 
 def _d_overlay_if_fits_holes(a):
     # solves bbb1b8b6
-    sep = np.where(np.all(a == 5, axis=0))[0][0]
+    sep = a.shape[1] // 2
     left = a[:, :sep]
     right = a[:, sep + 1 :]
 
     colors = np.unique(a)
-    colors = [c for c in colors if c != 0 and c != 5]
+    colors = [c for c in colors if c != 0] # and c != 5]
 
     overlay = left + right
 
@@ -544,48 +543,73 @@ def _d_overlay_if_fits_holes(a):
     else:
         return left
 
-def _d_connect_stars(a):
-    # solves 60a26a3e
+def _solve_bcb3040b(a):
+    # solves bcb3040b 
+    a = a.copy()
+    colors, n_col= np.unique(a, return_counts=True)
+    exactly_two_colors = colors[n_col == 2][0]
+    idxs = np.argwhere(a == exactly_two_colors)
+    dir = idxs[1] - idxs[0]
+    dir = np.sign(dir)
     out = a.copy()
-    red = 2
-
-    star_filter = np.array(
-        [
-            [0, -2, 0],
-            [-2, 0, -2],
-            [0, -2, 0],
-        ]
-    )
-
-    centers = []
-    windows = np.lib.stride_tricks.sliding_window_view(a, (3, 3))
-    for r in range(windows.shape[0]):
-        for c in range(windows.shape[1]):
-            window = windows[r, c]
-            check = window + star_filter
-            if np.sum(np.abs(check)) == 0:
-                centers.append((r + 1, c + 1))
-
-    center_set = set(centers)
-    for r in range(a.shape[0]):
-        for c in range(a.shape[1]):
-            if out[r, c] != 0 or (r, c) in center_set:
-                continue
-            for r1, c1 in centers:
-                for r2, c2 in centers:
-                    same_row = r1 == r2 and r == r1
-                    between_cols = c1 < c < c2 or c2 < c < c1
-
-                    same_col = c1 == c2 and c == c1
-                    between_rows = r1 < r < r2 or r2 < r < r1
-
-                    if same_row and between_cols:
-                        out[r, c] = 1
-
-                    if same_col and between_rows:
-                        out[r, c] = 1
-
+    current = idxs[0]
+    goal = idxs[1]
+    while True:
+        if np.all(current == goal):
+            break
+        curr_cel = out[current[0], current[1]]
+        if curr_cel == 0:
+            out[current[0], current[1]] = 2 # red
+        elif curr_cel == 1:
+            out[current[0], current[1]] = 3 # Green
+        current += dir
     return out
+
+def _make_connect_stars(line_color):
+    # solves 60a26a3e
+    def _connect_stars(a):
+        out = a.copy()
+        color_star = np.unique(a[a != 0])[0]
+
+        star_filter = np.array(
+            [
+                [0, -color_star, 0],
+                [-color_star, 0, -color_star],
+                [0, -color_star, 0],
+            ]
+        )
+
+        centers = []
+        windows = np.lib.stride_tricks.sliding_window_view(a, (3, 3))
+        for r in range(windows.shape[0]):
+            for c in range(windows.shape[1]):
+                window = windows[r, c]
+                check = window + star_filter
+                if np.sum(np.abs(check)) == 0:
+                    centers.append((r + 1, c + 1))
+
+        center_set = set(centers)
+        for r in range(a.shape[0]):
+            for c in range(a.shape[1]):
+                if out[r, c] != 0 or (r, c) in center_set:
+                    continue
+                for r1, c1 in centers:
+                    for r2, c2 in centers:
+                        same_row = r1 == r2 and r == r1
+                        between_cols = c1 < c < c2 or c2 < c < c1
+
+                        same_col = c1 == c2 and c == c1
+                        between_rows = r1 < r < r2 or r2 < r < r1
+
+                        if same_row and between_cols:
+                            out[r, c] = line_color
+
+                        if same_col and between_rows:
+                            out[r, c] = line_color
+
+        return out
+
+    return _connect_stars
 
 
 def _candidates():
@@ -610,9 +634,10 @@ def _d_candidates():
         _or,
         _d_count_dots_inside_box,
         _d_overlay_if_fits_holes,
-        _d_connect_stars,
-        _count_square_colors
-    ] + _candidates()
+        *[_make_connect_stars(line_color) for line_color in range(1, 10)],
+        _count_square_colors,
+        _solve_bcb3040b
+    ]
 
 
 def solve_milestone_B_dumb(training_sets, test_grid):
@@ -671,19 +696,15 @@ def solve_milestone_B_smart(training_sets, test_grid):
 
 
 if __name__ == "__main__":
+    import json
 
-    a = [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 2, 0, 0, 0, 0, 2, 2, 0, 0],
-        [0, 2, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 2, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 2, 2, 2, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 2, 0, 0, 2, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
-        [0, 0, 0, 0, 2, 2, 0, 0, 0, 0],
-    ]
+    with open("Milestones/D/bcb3040b.json") as f:
+        task = json.load(f)
 
-    a = np.array(a)
-    a = _diag_from_red_blue(a)
-
-    print(a)
+    for i, pair in enumerate(task["train"]):
+        a = np.array(pair["input"])
+        expected = np.array(pair["output"])
+        result = _solve_bcb3040b(a)
+        print(f"train {i}:", "OK" if np.array_equal(result, expected) else "FAIL")
+        print(result)
+        break
