@@ -68,7 +68,7 @@ def _largest_mixed_box_cutout(a):
             biggest_block = block
 
     r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0 : r1 + 1, c0 : c1 + 1]
+    return a[r0: r1 + 1, c0: c1 + 1]
 
 
 def _zoom_in_by_removing_black(a):
@@ -83,7 +83,7 @@ def _zoom_in_by_removing_black(a):
     while bottom_col > top_col and np.all(out[:, bottom_col] == 0):
         bottom_col -= 1
 
-    return out[top_row : bottom_row + 1, top_col : bottom_col + 1]
+    return out[top_row: bottom_row + 1, top_col: bottom_col + 1]
 
 
 def _cutout_recolor_largest_block_outside_color(a):
@@ -120,7 +120,7 @@ def _largest_box_cutout(a):
             biggest_block = block
 
     r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0 : r1 + 1, c0 : c1 + 1]
+    return a[r0: r1 + 1, c0: c1 + 1]
 
 
 def _hollow(a):
@@ -146,7 +146,7 @@ def _mark_blocks(a):
     for r in range(padded_marks.shape[0]):
         for c in range(padded_marks.shape[1]):
             if padded_marks[r, c] == 1:
-                padded_out[r - 1 : r + 2, c - 1 : c + 2] = 1
+                padded_out[r - 1: r + 2, c - 1: c + 2] = 1
 
     return padded_out[1:-1, 1:-1]
 
@@ -196,9 +196,32 @@ def _solve_dc433765(a):
     out[green_idx[0] + dir[0], green_idx[1] + dir[1]] = 3
     return out
 
-def _turn_sixes_to_twos(a):
-    # b1948b0a
-    return _make_recolor(6, 2)(a)
+
+def _solve_25d487eb(a):
+    # solves 25d487eb
+    out = a.copy()
+    colors, counts = np.unique(a[a != 0], return_counts=True)
+    color = colors[counts == 1][0]
+    start = np.argwhere(a == color)[0]
+
+    for direction in np.array([(0, 1), (1, 0), (0, -1), (-1, 0)]):
+        near = start + direction
+        if np.any(near < 0) or near[0] >= a.shape[0] or near[1] >= a.shape[1]:
+            continue
+        if a[near[0], near[1]] != 0:
+            continue
+
+        ray = start - direction
+        while 0 <= ray[0] < a.shape[0] and 0 <= ray[1] < a.shape[1]:
+            if a[ray[0], ray[1]] == 0:
+                fill = ray.copy()
+                while 0 <= fill[0] < a.shape[0] and 0 <= fill[1] < a.shape[1]:
+                    out[fill[0], fill[1]] = color
+                    fill -= direction
+                return out
+            ray -= direction
+
+    return out
 
 
 def _rotate_180(a):
@@ -254,33 +277,98 @@ def _move_dots_to_matching_border(a):
     up_color = a[0, 1]
     down_color = a[-1, 1]
 
-    for color, block in _find_touching_blocks(inside):
-        r, c = block[0]
-        r += 1
-        c += 1
-        out[r, c] = 0
+    for color in np.unique(inside):
+        if color == 0:
+            continue
+        blocks = np.argwhere(inside == color)
+        for block in blocks:
+            r, c = block
+            r += 1
+            c += 1
+            out[r, c] = 0
 
-        if color == left_color:
-            out[r, 1] = color
-        elif color == right_color:
-            out[r, a.shape[1] - 2] = color
-        elif color == up_color:
-            out[1, c] = color
-        elif color == down_color:
-            out[a.shape[0] - 2, c] = color
+            if color == left_color:
+                out[r, 1] = color
+            elif color == right_color:
+                out[r, a.shape[1] - 2] = color
+            elif color == up_color:
+                out[1, c] = color
+            elif color == down_color:
+                out[a.shape[0] - 2, c] = color
+            else:
+                pass
 
     return out
 
 
-def _make_solve_28e73c20(fill_color):
+def _solve_b2862040(a):
+    # solves b2862040
+    out = a.copy()
+
+    only_blue = np.where(a == 1, 1, 0)
+    for _, block in _find_touching_blocks(only_blue):
+        r0, r1, c0, c1 = _box(block)
+        sub = a[r0: r1 + 1, c0: c1 + 1]
+        seen = np.zeros(sub.shape)
+        todo = []
+
+        # Start with all background cells on the edge of this small cro p
+        for r in range(sub.shape[0]):
+            for c in (0, sub.shape[1] - 1):
+                if sub[r, c] == 9:
+                    todo.append((r, c))
+        for c in range(sub.shape[1]):
+            for r in (0, sub.shape[0] - 1):
+                if sub[r, c] == 9:
+                    todo.append((r, c))
+
+        while todo:
+            r, c = todo.pop()
+            if seen[r, c]:
+                continue
+            seen[r, c] = True
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nr, nc = r + dr, c + dc
+                if (
+                    0 <= nr < sub.shape[0]
+                    and 0 <= nc < sub.shape[1]
+                    and sub[nr, nc] == 9
+                    and not seen[nr, nc]
+                ):
+                    todo.append((nr, nc))
+
+        closed = False
+        for r in range(sub.shape[0]):
+            for c in range(sub.shape[1]):
+                if sub[r, c] == 9 and not seen[r, c]:
+                    closed = True
+
+        if closed:
+            for r, c in block:
+                out[r, c] = 8
+
+    return out
+
+
+def _make_solve_28e73c20(fill_color, start_corner=0, turn_direction=1):
     # solves 28e73c20
     def _solve_28e73c20(a):
         wall = 1
         out = np.pad(a, 1, constant_values=wall)
-        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-        direction = (0, 1)
-        r, c = (1, 1)  # BUG HERE BECAUSE OFPAD ARGH!!!
-        curr_diretion_idx = 0
+        corners = [
+            (1, 1),
+            (1, a.shape[1]),
+            (a.shape[0], a.shape[1]),
+            (a.shape[0], 1),
+        ]
+        clockwise_directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        if turn_direction == 1:
+            directions = clockwise_directions
+        else:
+            directions = [clockwise_directions[0], *clockwise_directions[:0:-1]]
+        r, c = corners[start_corner]
+        curr_diretion_idx = start_corner
+        direction = directions[curr_diretion_idx % 4]
         turns_in_a_row = 0
 
         while True:
@@ -298,7 +386,7 @@ def _make_solve_28e73c20(fill_color):
                 r, c = next_cell
                 turns_in_a_row = 0
             else:
-                curr_diretion_idx += 1
+                curr_diretion_idx += turn_direction
                 direction = directions[curr_diretion_idx % 4]
                 turns_in_a_row += 1
                 if turns_in_a_row == 4:
@@ -314,7 +402,7 @@ def _make_solve_0520fde7(match_color, output_color):
     def _solve_0520fde7(a):
         mid = a.shape[1] // 2
         left = a[:, :mid]
-        right = np.fliplr(a[:, mid + 1 :])
+        right = a[:, mid + 1 :]
         out = np.zeros(left.shape)
 
         for r in range(left.shape[0]):
@@ -429,7 +517,7 @@ def _staircase(a):
     n_rows = a.shape[1] // 2
     out = np.zeros((n_rows, a.shape[1]))
     for r in range(n_rows):
-        out[r, : n_color + r] = color
+        out[r,: n_color + r] = color
     return out
 
 
@@ -442,7 +530,7 @@ def _overlay_3_sections(a):
     # solves cf98881b
     sep_cols = [c for c in range(a.shape[1]) if np.all(a[:, c] == 2)]
     c1, c2 = sep_cols[0], sep_cols[1]
-    left, middle, right = a[:, :c1], a[:, c1 + 1 : c2], a[:, c2 + 1 :]
+    left, middle, right = a[:, :c1], a[:, c1 + 1: c2], a[:, c2 + 1 :]
     out = np.zeros_like(left)
     for r in range(left.shape[0]):
         for c in range(left.shape[1]):
@@ -459,13 +547,25 @@ def _count_square_colors(a):
     # solves 81c0276b
     color, counts = np.unique(a[a != 0], return_counts=True)
     most_common_color = color[np.argmax(counts)]
-    other_colors, other_colors_count = color[color != most_common_color], counts[color != most_common_color]
-    out = np.zeros((np.max(other_colors_count), len(other_colors_count)))
+    other_colors, other_colors_count = (
+        color[color != most_common_color],
+        counts[color != most_common_color],
+    )
+    out = np.zeros((np.max(other_colors_count), np.max(other_colors_count)))
     for col in range(out.shape[1]):
         for row in range(other_colors_count[col]):
             out[row, col] = other_colors[col]
 
     return out
+
+
+def _solve_9af7a82c(a):
+    # solves 9af7a82c
+    colors, counts = np.unique(a[a != 0], return_counts=True)
+    order = np.argsort(-counts)
+    colors, counts = colors[order], counts[order]
+    rows = np.arange(np.max(counts))[:, None]
+    return np.where(rows < counts, colors, 0)
 
 
 def _d_expand_row_to_diagonal_waves(a):
@@ -525,13 +625,14 @@ def _d_xor_top_bottom_to_six(a):
 
     x_or = np.logical_xor(top_has_color, bottom_has_color)
 
-    out = x_or * 6 # So it's lila
+    out = x_or * 6  # So it's lila
     return out
 
 
 def _fill_with_common_cell_color(a):
     # solves 4b6b68e5
     pass
+
 
 def _or(a):
     # solves 195ba7dc
@@ -544,7 +645,7 @@ def _or(a):
     right_has_color = right != 0
     x_or = np.logical_or(left_has_color, right_has_color)
 
-    out = x_or * 1 # So it's int
+    out = x_or * 1  # So it's int
     return out
 
 
@@ -555,14 +656,14 @@ def _d_count_dots_inside_box(a):
     rows, cols = np.where(a == wall)
     r0, r1 = rows.min(), rows.max()
     c0, c1 = cols.min(), cols.max()
-    inside = a[r0 + 1 : r1, c0 + 1 : c1]
+    inside = a[r0 + 1: r1, c0 + 1: c1]
     dot_color, n_dots = np.unique(inside[inside != 0], return_counts=True)
 
     dot_mask = inside == dot_color
     dot_spots = np.argwhere(dot_mask)
     n_dots = len(dot_spots)
 
-    out = np.zeros((3,3))
+    out = np.zeros((3, 3))
     dots_added = 0
 
     for r in range(3):
@@ -573,6 +674,86 @@ def _d_count_dots_inside_box(a):
                 return out
 
 
+def _d_solve_992798f6(a):
+    # solves 992798f6
+    out = a.copy()
+    red = np.argwhere(a == 2)[0]
+    blue = np.argwhere(a == 1)[0]
+    diag = np.sign(blue - red)
+    pos = red + diag
+    diff = blue - pos
+
+    if abs(diff[0]) > abs(diff[1]):
+        straight = np.array([diag[0], 0])
+    else:
+        straight = np.array([0, diag[1]])
+
+    while abs(blue[0] - pos[0]) != abs(blue[1] - pos[1]):
+        out[pos[0], pos[1]] = 3
+        pos += straight
+
+    while np.any(pos != blue):
+        out[pos[0], pos[1]] = 3
+        pos += diag
+
+    return out
+
+
+def _d_solve_d931c21c(a):
+    # solves d931c21c
+    out = a.copy()
+    for _, block in _find_touching_blocks(a):
+        block = np.array(block)
+        r0, c0 = np.maximum(block.min(axis=0) - 1, 0)
+        r1, c1 = np.minimum(block.max(axis=0) + 1, np.array(a.shape) - 1)
+        sub = a[r0: r1 + 1, c0: c1 + 1]
+        seen = np.zeros(sub.shape, dtype=bool)
+        todo = []
+        for r in range(sub.shape[0]):
+            for c in (0, sub.shape[1] - 1):
+                if sub[r, c] == 0:
+                    todo.append((r, c))
+        for c in range(sub.shape[1]):
+            for r in (0, sub.shape[0] - 1):
+                if sub[r, c] == 0:
+                    todo.append((r, c))
+
+        while todo:
+            r, c = todo.pop()
+            if seen[r, c]:
+                continue
+            seen[r, c] = True
+            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nr, nc = r + dr, c + dc
+                if (
+                    0 <= nr < sub.shape[0]
+                    and 0 <= nc < sub.shape[1]
+                    and sub[nr, nc] == 0
+                    and not seen[nr, nc]
+                ):
+                    todo.append((nr, nc))
+
+        inside = (sub == 0) & ~seen
+        if not np.any(inside):
+            continue
+
+        wall = np.pad(sub == 1, 1)
+        near_wall = np.zeros(sub.shape, dtype=bool)
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr != 0 or dc != 0:
+                    near_wall |= wall[
+                        1 + dr: 1 + dr + sub.shape[0],
+                        1 + dc: 1 + dc + sub.shape[1],
+                    ]
+
+        patch = out[r0: r1 + 1, c0: c1 + 1]
+        patch[(sub == 0) & seen & near_wall] = 2
+        patch[inside & near_wall] = 3
+
+    return out
+
+
 def _d_overlay_if_fits_holes(a):
     # solves bbb1b8b6
     sep = a.shape[1] // 2
@@ -580,7 +761,7 @@ def _d_overlay_if_fits_holes(a):
     right = a[:, sep + 1 :]
 
     colors = np.unique(a)
-    colors = [c for c in colors if c != 0] # and c != 5]
+    colors = [c for c in colors if c != 0]  # and c != 5]
 
     overlay = left + right
 
@@ -588,6 +769,7 @@ def _d_overlay_if_fits_holes(a):
         return overlay
     else:
         return left
+
 
 def _make_solve_bcb3040b(cross_color):
     # solves bcb3040b
@@ -616,6 +798,7 @@ def _make_solve_bcb3040b(cross_color):
         return out
 
     return _solve_bcb3040b
+
 
 def _make_connect_stars(line_color):
     # solves 60a26a3e
@@ -654,12 +837,17 @@ def _make_connect_stars(line_color):
                         between_rows = r1 < r < r2 or r2 < r < r1
 
                         if same_row and between_cols or same_col and between_rows:
-                            line = out[min(r1,r2):max(r1,r2)+1,min(c1,c2):max(c1,c2) + 1]
+                            line = out[
+                                min(r1, r2): max(r1, r2) + 1,
+                                min(c1, c2): max(c1, c2) + 1,
+                            ]
                             color, count = np.unique(line, return_counts=True)
 
-                            if count[color == color_star] > 2: # More than 2 red -> a star blocks ray
+                            if (
+                                count[color == color_star] > 2
+                            ):  # More than 2 red -> a star blocks ray
                                 continue
-                            elif count[color == 0] == 0: # No black, no place for ray
+                            elif count[color == 0] == 0:  # No black, no place for ray
                                 continue
 
                             else:
@@ -671,7 +859,12 @@ def _make_connect_stars(line_color):
 
 
 def _solve_28e73c20_candidates():
-    return _color_variants(_make_solve_28e73c20, 1)
+    return [
+        _make_solve_28e73c20(fill_color, start_corner, turn_direction)
+        for fill_color in range(1, 10)
+        for start_corner in range(4)
+        for turn_direction in (1, -1)
+    ]
 
 
 def _solve_0520fde7_candidates():
@@ -705,7 +898,10 @@ def _candidates():
         _staircase,
         _transpose,
         _overlay_3_sections,
-        _solve_dc433765
+        _solve_25d487eb,
+        _solve_b2862040,
+        _solve_9af7a82c,
+        _solve_dc433765,
     ]
 
 
@@ -716,6 +912,8 @@ def _d_candidates():
         _d_xor_top_bottom_to_six,
         _or,
         _d_count_dots_inside_box,
+        _d_solve_992798f6,
+        _d_solve_d931c21c,
         _d_overlay_if_fits_holes,
         *[_make_connect_stars(line_color) for line_color in range(1, 10)],
         _count_square_colors,
