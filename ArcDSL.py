@@ -543,27 +543,33 @@ def _d_overlay_if_fits_holes(a):
     else:
         return left
 
-def _solve_bcb3040b(a):
-    # solves bcb3040b 
-    a = a.copy()
-    colors, n_col= np.unique(a, return_counts=True)
-    exactly_two_colors = colors[n_col == 2][0]
-    idxs = np.argwhere(a == exactly_two_colors)
-    dir = idxs[1] - idxs[0]
-    dir = np.sign(dir)
-    out = a.copy()
-    current = idxs[0]
-    goal = idxs[1]
-    while True:
-        if np.all(current == goal):
-            break
-        curr_cel = out[current[0], current[1]]
-        if curr_cel == 0:
-            out[current[0], current[1]] = 2 # red
-        elif curr_cel == 1:
-            out[current[0], current[1]] = 3 # Green
-        current += dir
-    return out
+def _make_solve_bcb3040b(cross_color):
+    # solves bcb3040b
+    # The path is drawn in the endpoint color (inferable from the input), but the
+    # color of crossed cells only appears in the outputs, so we register one
+    # variant per color and let the training check pick the right one.
+    def _solve_bcb3040b(a):
+        a = a.copy()
+        colors, n_col = np.unique(a, return_counts=True)
+        exactly_two_colors = colors[n_col == 2][0]
+        idxs = np.argwhere(a == exactly_two_colors)
+        dir = idxs[1] - idxs[0]
+        dir = np.sign(dir)
+        out = a.copy()
+        current = idxs[0]
+        goal = idxs[1]
+        while True:
+            if np.all(current == goal):
+                break
+            curr_cel = out[current[0], current[1]]
+            if curr_cel == 0:
+                out[current[0], current[1]] = exactly_two_colors
+            elif curr_cel != exactly_two_colors:
+                out[current[0], current[1]] = cross_color
+            current += dir
+        return out
+
+    return _solve_bcb3040b
 
 def _make_connect_stars(line_color):
     # solves 60a26a3e
@@ -636,7 +642,7 @@ def _d_candidates():
         _d_overlay_if_fits_holes,
         *[_make_connect_stars(line_color) for line_color in range(1, 10)],
         _count_square_colors,
-        _solve_bcb3040b
+        *[_make_solve_bcb3040b(cross_color) for cross_color in range(1, 10)],
     ]
 
 
@@ -704,7 +710,7 @@ if __name__ == "__main__":
     for i, pair in enumerate(task["train"]):
         a = np.array(pair["input"])
         expected = np.array(pair["output"])
-        result = _solve_bcb3040b(a)
+        result = _make_solve_bcb3040b(3)(a)
         print(f"train {i}:", "OK" if np.array_equal(result, expected) else "FAIL")
         print(result)
         break
