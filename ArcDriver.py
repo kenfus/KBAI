@@ -64,14 +64,13 @@ def load_arc_problems(path: str, problem_data: list[str]) -> list[ArcProblem]:
 
 if __name__ == "__main__":
 
-    # Here you can use this to open other milestone data directories for running against
-    #  you'll should copy this code and change the path to the milestone you want to load (B, C or D)
-    milestone_path = os.path.join("Milestones", "D")
-    milestone_data: list[str] = os.listdir(milestone_path)
-
-    arc_milestone_problems: list[ArcProblem] = load_arc_problems(
-        milestone_path, milestone_data
-    )
+    # Here you can use this to open milestone data directories for running against.
+    milestone_names = ["B", "C", "D"]
+    arc_milestone_problems: list[ArcProblem] = list()
+    for milestone_name in milestone_names:
+        milestone_path = os.path.join("Milestones", milestone_name)
+        milestone_data: list[str] = os.listdir(milestone_path)
+        arc_milestone_problems.extend(load_arc_problems(milestone_path, milestone_data))
 
     # instantiate the agent once
     arc_agent: ArcAgent = ArcAgent()

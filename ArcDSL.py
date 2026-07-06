@@ -1,6 +1,19 @@
 import numpy as np
 
 
+def _color_variants(make_transform, n_colors):
+    def build(args):
+        if len(args) == n_colors:
+            return [make_transform(*args)]
+
+        variants = []
+        for color in range(1, 10):
+            variants.extend(build((*args, color)))
+        return variants
+
+    return build(())
+
+
 def _find_touching_blocks(a, same_color=True):
     # Findd touching block with the help of a ff-algorithm.
 
@@ -153,11 +166,39 @@ def _AND_left_right(a):
     return out
 
 
+def _make_recolor(changed_color, output_color):
+    def _recolor(a):
+        out = a.copy()
+        out[out == changed_color] = output_color
+        return out
+
+    return _recolor
+
+
+def _solve_b1948b0a_candidates():
+    # solves b1948b0a
+    return [
+        _make_recolor(changed_color, output_color)
+        for changed_color in range(1, 10)
+        for output_color in range(1, 10)
+        if changed_color != output_color
+    ]
+
+
+def _solve_dc433765(a):
+    a = a.copy()
+
+    yellow_idx = np.argwhere(a == 4)[0]
+    green_idx = np.argwhere(a == 3)[0]
+    dir = np.sign(yellow_idx - green_idx)
+    out = a.copy()
+    out[green_idx[0], green_idx[1]] = 0
+    out[green_idx[0] + dir[0], green_idx[1] + dir[1]] = 3
+    return out
+
 def _turn_sixes_to_twos(a):
     # b1948b0a
-    out = a.copy()
-    out[out == 6] = 2
-    return out
+    return _make_recolor(6, 2)(a)
 
 
 def _rotate_180(a):
@@ -231,54 +272,59 @@ def _move_dots_to_matching_border(a):
     return out
 
 
-def _labyrinth_fill(a):
-    # 28e73c20
-    green = 3
-    wall = 1
-    out = np.pad(a, 1, constant_values=wall)
-    directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-    direction = (0, 1)
-    r, c = (1, 1)  # BUG HERE BECAUSE OFPAD ARGH!!!
-    curr_diretion_idx = 0
-    turns_in_a_row = 0
+def _make_solve_28e73c20(fill_color):
+    # solves 28e73c20
+    def _solve_28e73c20(a):
+        wall = 1
+        out = np.pad(a, 1, constant_values=wall)
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        direction = (0, 1)
+        r, c = (1, 1)  # BUG HERE BECAUSE OFPAD ARGH!!!
+        curr_diretion_idx = 0
+        turns_in_a_row = 0
 
-    while True:
-        out[r, c] = green
-        next_cell = r + direction[0], c + direction[1]
-        next_two_cells = (r + 2 * direction[0], c + 2 * direction[1])
-        can_move = True
-        if (
-            out[next_cell] == wall
-            or out[next_cell] == green
-            or out[next_two_cells] == green
-        ):
-            can_move = False
-        if can_move:
-            r, c = next_cell
-            turns_in_a_row = 0
-        else:
-            curr_diretion_idx += 1
-            direction = directions[curr_diretion_idx % 4]
-            turns_in_a_row += 1
-            if turns_in_a_row == 4:
-                break
+        while True:
+            out[r, c] = fill_color
+            next_cell = r + direction[0], c + direction[1]
+            next_two_cells = (r + 2 * direction[0], c + 2 * direction[1])
+            can_move = True
+            if (
+                out[next_cell] == wall
+                or out[next_cell] == fill_color
+                or out[next_two_cells] == fill_color
+            ):
+                can_move = False
+            if can_move:
+                r, c = next_cell
+                turns_in_a_row = 0
+            else:
+                curr_diretion_idx += 1
+                direction = directions[curr_diretion_idx % 4]
+                turns_in_a_row += 1
+                if turns_in_a_row == 4:
+                    break
 
-    return out[1:-1, 1:-1]
+        return out[1:-1, 1:-1]
+
+    return _solve_28e73c20
 
 
-def _mirror_match(a):
-    # 0520fde7
-    mid = a.shape[1] // 2
-    left = a[:, :mid]
-    right = np.fliplr(a[:, mid + 1 :])
-    out = np.zeros(left.shape)
+def _make_solve_0520fde7(match_color, output_color):
+    # solves 0520fde7
+    def _solve_0520fde7(a):
+        mid = a.shape[1] // 2
+        left = a[:, :mid]
+        right = np.fliplr(a[:, mid + 1 :])
+        out = np.zeros(left.shape)
 
-    for r in range(left.shape[0]):
-        for c in range(left.shape[1]):
-            if left[r, c] == 1 and right[r, c] == 1:
-                out[r, c] = 2
+        for r in range(left.shape[0]):
+            for c in range(left.shape[1]):
+                if left[r, c] == match_color and right[r, c] == match_color:
+                    out[r, c] = output_color
 
-    return out
+        return out
+
+    return _solve_0520fde7
 
 
 def _mask_gray_w_input_color(a):
@@ -356,7 +402,7 @@ def _mirror_2x(a):
 
 def _xor_halves_to_green(a):
     # solves 3428a4f5
-    sep = np.where(np.all(a == 4, axis=1))[0][0]
+    sep = a.shape[0] // 2
     top, bot = a[:sep], a[sep + 1 :]
     out = np.zeros_like(top)
     for r in range(top.shape[0]):
@@ -607,21 +653,51 @@ def _make_connect_stars(line_color):
                         same_col = c1 == c2 and c == c1
                         between_rows = r1 < r < r2 or r2 < r < r1
 
-                        if same_row and between_cols:
-                            out[r, c] = line_color
+                        if same_row and between_cols or same_col and between_rows:
+                            line = out[min(r1,r2):max(r1,r2)+1,min(c1,c2):max(c1,c2) + 1]
+                            color, count = np.unique(line, return_counts=True)
 
-                        if same_col and between_rows:
-                            out[r, c] = line_color
+                            if count[color == color_star] > 2: # More than 2 red -> a star blocks ray
+                                continue
+                            elif count[color == 0] == 0: # No black, no place for ray
+                                continue
+
+                            else:
+                                out[r, c] = line_color
 
         return out
 
     return _connect_stars
 
 
+def _solve_28e73c20_candidates():
+    return _color_variants(_make_solve_28e73c20, 1)
+
+
+def _solve_0520fde7_candidates():
+    return _color_variants(_make_solve_0520fde7, 2)
+
+
 def _candidates():
     return [
+        _largest_box_cutout,
+        _hollow,
+        _mark_blocks,
+        _AND_left_right,
+        *_solve_b1948b0a_candidates(),
+        _rotate_180,
+        _rotate_90_left,
+        _mirror_bottom_half,
+        _top_bottom_shared_black_to_green,
+        _top_bottom_shared_black_to_black_else_green,
+        _diagonal_cross,
+        _move_dots_to_matching_border,
+        *_solve_28e73c20_candidates(),
+        *_solve_0520fde7_candidates(),
+        _mask_gray_w_input_color,
         _cutout_recolor_largest_block_outside_color,
         _diag_from_red_blue,
+        _swap_box_cutout,
         _fill_matching_border_row,
         _mirror_2x,
         _xor_halves_to_green,
@@ -629,6 +705,7 @@ def _candidates():
         _staircase,
         _transpose,
         _overlay_3_sections,
+        _solve_dc433765
     ]
 
 
@@ -646,14 +723,26 @@ def _d_candidates():
     ]
 
 
-def solve_milestone_B_dumb(training_sets, test_grid):
+def _all_candidates():
+    return [
+        *[
+            candidate
+            for candidate in _candidates()
+            if "_solve_28e73c20" not in candidate.__name__
+        ],
+        *_d_candidates(),
+        *_solve_28e73c20_candidates(),
+    ]
+
+
+def _solve_with_candidates(training_sets, test_grid, candidates):
     train = [
         (pair.get_input_data().data(), pair.get_output_data().data())
         for pair in training_sets
     ]
     test = np.asarray(test_grid)
 
-    for transform in _candidates():
+    for transform in candidates:
         try:
             works = True
             for inp, out in train:
@@ -668,30 +757,18 @@ def solve_milestone_B_dumb(training_sets, test_grid):
             # print(f"Error with transform: {transform} on {test} with train {train}")
             pass
     return None
+
+
+def solve_milestone_B_dumb(training_sets, test_grid):
+    return _solve_with_candidates(training_sets, test_grid, _candidates())
 
 
 def solve_milestone_D_dumb(training_sets, test_grid):
-    train = [
-        (pair.get_input_data().data(), pair.get_output_data().data())
-        for pair in training_sets
-    ]
-    test = np.asarray(test_grid)
+    return _solve_with_candidates(training_sets, test_grid, _d_candidates())
 
-    for transform in _d_candidates():
-        try:
-            works = True
-            for inp, out in train:
-                if not np.array_equal(transform(inp), out):
-                    works = False
-                    break
-            if works:
-                return transform(test)
-            else:
-                pass
-        except:
-            # print(f"Error with transform: {transform} on {test} with train {train}")
-            pass
-    return None
+
+def solve_all_milestones_dumb(training_sets, test_grid):
+    return _solve_with_candidates(training_sets, test_grid, _all_candidates())
 
 
 def solve_milestone_B_smart(training_sets, test_grid):
@@ -704,13 +781,13 @@ def solve_milestone_B_smart(training_sets, test_grid):
 if __name__ == "__main__":
     import json
 
-    with open("Milestones/D/bcb3040b.json") as f:
+    with open("Milestones/C/dc433765.pdf") as f:
         task = json.load(f)
 
     for i, pair in enumerate(task["train"]):
         a = np.array(pair["input"])
         expected = np.array(pair["output"])
-        result = _make_solve_bcb3040b(3)(a)
+        result = _solve_dc433765(3)(a)
         print(f"train {i}:", "OK" if np.array_equal(result, expected) else "FAIL")
         print(result)
         break
