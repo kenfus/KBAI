@@ -1,14 +1,18 @@
+import inspect
+from functools import partial
+
 import numpy as np
 
 
-def _color_variants(make_transform, n_colors):
-    def build(args):
-        if len(args) == n_colors:
-            return [make_transform(*args)]
+def _color_variants(transform, n_colors):
+    def build(colors):
+        if len(colors) == n_colors:
+            kwargs = {f"color{i + 1}": color for i, color in enumerate(colors)}
+            return [partial(transform, **kwargs)]
 
         variants = []
         for color in range(1, 10):
-            variants.extend(build((*args, color)))
+            variants.extend(build((*colors, color)))
         return variants
 
     return build(())
@@ -68,7 +72,7 @@ def _largest_mixed_box_cutout(a):
             biggest_block = block
 
     r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0: r1 + 1, c0: c1 + 1]
+    return a[r0 : r1 + 1, c0 : c1 + 1]
 
 
 def _zoom_in_by_removing_black(a):
@@ -83,7 +87,7 @@ def _zoom_in_by_removing_black(a):
     while bottom_col > top_col and np.all(out[:, bottom_col] == 0):
         bottom_col -= 1
 
-    return out[top_row: bottom_row + 1, top_col: bottom_col + 1]
+    return out[top_row : bottom_row + 1, top_col : bottom_col + 1]
 
 
 def _cutout_recolor_largest_block_outside_color(a):
@@ -120,7 +124,7 @@ def _largest_box_cutout(a):
             biggest_block = block
 
     r0, r1, c0, c1 = _box(biggest_block)
-    return a[r0: r1 + 1, c0: c1 + 1]
+    return a[r0 : r1 + 1, c0 : c1 + 1]
 
 
 def _hollow(a):
@@ -146,7 +150,7 @@ def _mark_blocks(a):
     for r in range(padded_marks.shape[0]):
         for c in range(padded_marks.shape[1]):
             if padded_marks[r, c] == 1:
-                padded_out[r - 1: r + 2, c - 1: c + 2] = 1
+                padded_out[r - 1 : r + 2, c - 1 : c + 2] = 1
 
     return padded_out[1:-1, 1:-1]
 
@@ -166,23 +170,10 @@ def _AND_left_right(a):
     return out
 
 
-def _make_recolor(changed_color, output_color):
-    def _recolor(a):
-        out = a.copy()
-        out[out == changed_color] = output_color
-        return out
-
-    return _recolor
-
-
-def _solve_b1948b0a_candidates():
-    # solves b1948b0a
-    return [
-        _make_recolor(changed_color, output_color)
-        for changed_color in range(1, 10)
-        for output_color in range(1, 10)
-        if changed_color != output_color
-    ]
+def _solve_b1948b0a(a, color1=6, color2=2):
+    out = a.copy()
+    out[out == color1] = color2
+    return out
 
 
 def _solve_dc433765(a):
@@ -308,7 +299,7 @@ def _solve_b2862040(a):
     only_blue = np.where(a == 1, 1, 0)
     for _, block in _find_touching_blocks(only_blue):
         r0, r1, c0, c1 = _box(block)
-        sub = a[r0: r1 + 1, c0: c1 + 1]
+        sub = a[r0 : r1 + 1, c0 : c1 + 1]
         seen = np.zeros(sub.shape)
         todo = []
 
@@ -350,69 +341,51 @@ def _solve_b2862040(a):
     return out
 
 
-def _make_solve_28e73c20(fill_color, start_corner=0, turn_direction=1):
-    # solves 28e73c20
-    def _solve_28e73c20(a):
-        wall = 1
-        out = np.pad(a, 1, constant_values=wall)
-        corners = [
-            (1, 1),
-            (1, a.shape[1]),
-            (a.shape[0], a.shape[1]),
-            (a.shape[0], 1),
-        ]
-        clockwise_directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-        if turn_direction == 1:
-            directions = clockwise_directions
+def _solve_28e73c20(a, color1=3):
+    wall = 1
+    out = np.pad(a, 1, constant_values=wall)
+    directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # clockwise
+    r, c = 1, 1  # start in the top-left corner
+    curr_diretion_idx = 0
+    direction = directions[curr_diretion_idx % 4]
+    turns_in_a_row = 0
+
+    while True:
+        out[r, c] = color1
+        next_cell = r + direction[0], c + direction[1]
+        next_two_cells = (r + 2 * direction[0], c + 2 * direction[1])
+        can_move = True
+        if (
+            out[next_cell] == wall
+            or out[next_cell] == color1
+            or out[next_two_cells] == color1
+        ):
+            can_move = False
+        if can_move:
+            r, c = next_cell
+            turns_in_a_row = 0
         else:
-            directions = [clockwise_directions[0], *clockwise_directions[:0:-1]]
-        r, c = corners[start_corner]
-        curr_diretion_idx = start_corner
-        direction = directions[curr_diretion_idx % 4]
-        turns_in_a_row = 0
+            curr_diretion_idx += 1
+            direction = directions[curr_diretion_idx % 4]
+            turns_in_a_row += 1
+            if turns_in_a_row == 4:
+                break
 
-        while True:
-            out[r, c] = fill_color
-            next_cell = r + direction[0], c + direction[1]
-            next_two_cells = (r + 2 * direction[0], c + 2 * direction[1])
-            can_move = True
-            if (
-                out[next_cell] == wall
-                or out[next_cell] == fill_color
-                or out[next_two_cells] == fill_color
-            ):
-                can_move = False
-            if can_move:
-                r, c = next_cell
-                turns_in_a_row = 0
-            else:
-                curr_diretion_idx += turn_direction
-                direction = directions[curr_diretion_idx % 4]
-                turns_in_a_row += 1
-                if turns_in_a_row == 4:
-                    break
-
-        return out[1:-1, 1:-1]
-
-    return _solve_28e73c20
+    return out[1:-1, 1:-1]
 
 
-def _make_solve_0520fde7(match_color, output_color):
-    # solves 0520fde7
-    def _solve_0520fde7(a):
-        mid = a.shape[1] // 2
-        left = a[:, :mid]
-        right = a[:, mid + 1 :]
-        out = np.zeros(left.shape)
+def _solve_0520fde7(a, color1=1, color2=2):
+    mid = a.shape[1] // 2
+    left = a[:, :mid]
+    right = a[:, mid + 1 :]
+    out = np.zeros(left.shape)
 
-        for r in range(left.shape[0]):
-            for c in range(left.shape[1]):
-                if left[r, c] == match_color and right[r, c] == match_color:
-                    out[r, c] = output_color
+    for r in range(left.shape[0]):
+        for c in range(left.shape[1]):
+            if left[r, c] == color1 and right[r, c] == color1:
+                out[r, c] = color2
 
-        return out
-
-    return _solve_0520fde7
+    return out
 
 
 def _mask_gray_w_input_color(a):
@@ -517,7 +490,7 @@ def _staircase(a):
     n_rows = a.shape[1] // 2
     out = np.zeros((n_rows, a.shape[1]))
     for r in range(n_rows):
-        out[r,: n_color + r] = color
+        out[r, : n_color + r] = color
     return out
 
 
@@ -530,7 +503,7 @@ def _overlay_3_sections(a):
     # solves cf98881b
     sep_cols = [c for c in range(a.shape[1]) if np.all(a[:, c] == 2)]
     c1, c2 = sep_cols[0], sep_cols[1]
-    left, middle, right = a[:, :c1], a[:, c1 + 1: c2], a[:, c2 + 1 :]
+    left, middle, right = a[:, :c1], a[:, c1 + 1 : c2], a[:, c2 + 1 :]
     out = np.zeros_like(left)
     for r in range(left.shape[0]):
         for c in range(left.shape[1]):
@@ -656,7 +629,7 @@ def _d_count_dots_inside_box(a):
     rows, cols = np.where(a == wall)
     r0, r1 = rows.min(), rows.max()
     c0, c1 = cols.min(), cols.max()
-    inside = a[r0 + 1: r1, c0 + 1: c1]
+    inside = a[r0 + 1 : r1, c0 + 1 : c1]
     dot_color, n_dots = np.unique(inside[inside != 0], return_counts=True)
 
     dot_mask = inside == dot_color
@@ -706,7 +679,7 @@ def _d_solve_d931c21c(a):
         block = np.array(block)
         r0, c0 = np.maximum(block.min(axis=0) - 1, 0)
         r1, c1 = np.minimum(block.max(axis=0) + 1, np.array(a.shape) - 1)
-        sub = a[r0: r1 + 1, c0: c1 + 1]
+        sub = a[r0 : r1 + 1, c0 : c1 + 1]
         seen = np.zeros(sub.shape, dtype=bool)
         todo = []
         for r in range(sub.shape[0]):
@@ -743,11 +716,11 @@ def _d_solve_d931c21c(a):
             for dc in (-1, 0, 1):
                 if dr != 0 or dc != 0:
                     near_wall |= wall[
-                        1 + dr: 1 + dr + sub.shape[0],
-                        1 + dc: 1 + dc + sub.shape[1],
+                        1 + dr : 1 + dr + sub.shape[0],
+                        1 + dc : 1 + dc + sub.shape[1],
                     ]
 
-        patch = out[r0: r1 + 1, c0: c1 + 1]
+        patch = out[r0 : r1 + 1, c0 : c1 + 1]
         patch[(sub == 0) & seen & near_wall] = 2
         patch[inside & near_wall] = 3
 
@@ -771,104 +744,81 @@ def _d_overlay_if_fits_holes(a):
         return left
 
 
-def _make_solve_bcb3040b(cross_color):
-    # solves bcb3040b
-    # The path is drawn in the endpoint color (inferable from the input), but the
-    # color of crossed cells only appears in the outputs, so we register one
-    # variant per color and let the training check pick the right one.
-    def _solve_bcb3040b(a):
-        a = a.copy()
-        colors, n_col = np.unique(a, return_counts=True)
-        exactly_two_colors = colors[n_col == 2][0]
-        idxs = np.argwhere(a == exactly_two_colors)
-        dir = idxs[1] - idxs[0]
-        dir = np.sign(dir)
-        out = a.copy()
-        current = idxs[0]
-        goal = idxs[1]
-        while True:
-            if np.all(current == goal):
-                break
-            curr_cel = out[current[0], current[1]]
-            if curr_cel == 0:
-                out[current[0], current[1]] = exactly_two_colors
-            elif curr_cel != exactly_two_colors:
-                out[current[0], current[1]] = cross_color
-            current += dir
-        return out
-
-    return _solve_bcb3040b
+def _solve_bcb3040b(a, color1=3):
+    a = a.copy()
+    colors, n_col = np.unique(a, return_counts=True)
+    exactly_two_colors = colors[n_col == 2][0]
+    idxs = np.argwhere(a == exactly_two_colors)
+    dir = idxs[1] - idxs[0]
+    dir = np.sign(dir)
+    out = a.copy()
+    current = idxs[0]
+    goal = idxs[1]
+    while True:
+        if np.all(current == goal):
+            break
+        curr_cel = out[current[0], current[1]]
+        if curr_cel == 0:
+            out[current[0], current[1]] = exactly_two_colors
+        elif curr_cel != exactly_two_colors:
+            out[current[0], current[1]] = color1
+        current += dir
+    return out
 
 
-def _make_connect_stars(line_color):
+def _connect_stars(a, color1=1):
     # solves 60a26a3e
-    def _connect_stars(a):
-        out = a.copy()
-        color_star = np.unique(a[a != 0])[0]
+    out = a.copy()
+    color_star = np.unique(a[a != 0])[0]
 
-        star_filter = np.array(
-            [
-                [0, -color_star, 0],
-                [-color_star, 0, -color_star],
-                [0, -color_star, 0],
-            ]
-        )
+    star_filter = np.array(
+        [
+            [0, -color_star, 0],
+            [-color_star, 0, -color_star],
+            [0, -color_star, 0],
+        ]
+    )
 
-        centers = []
-        windows = np.lib.stride_tricks.sliding_window_view(a, (3, 3))
-        for r in range(windows.shape[0]):
-            for c in range(windows.shape[1]):
-                window = windows[r, c]
-                check = window + star_filter
-                if np.sum(np.abs(check)) == 0:
-                    centers.append((r + 1, c + 1))
+    centers = []
+    windows = np.lib.stride_tricks.sliding_window_view(a, (3, 3))
+    for r in range(windows.shape[0]):
+        for c in range(windows.shape[1]):
+            window = windows[r, c]
+            check = window + star_filter
+            if np.sum(np.abs(check)) == 0:
+                centers.append((r + 1, c + 1))
 
-        center_set = set(centers)
-        for r in range(a.shape[0]):
-            for c in range(a.shape[1]):
-                if out[r, c] != 0 or (r, c) in center_set:
-                    continue
-                for r1, c1 in centers:
-                    for r2, c2 in centers:
-                        same_row = r1 == r2 and r == r1
-                        between_cols = c1 < c < c2 or c2 < c < c1
+    center_set = set(centers)
+    for r in range(a.shape[0]):
+        for c in range(a.shape[1]):
+            if out[r, c] != 0 or (r, c) in center_set:
+                continue
+            for r1, c1 in centers:
+                for r2, c2 in centers:
+                    same_row = r1 == r2 and r == r1
+                    between_cols = c1 < c < c2 or c2 < c < c1
 
-                        same_col = c1 == c2 and c == c1
-                        between_rows = r1 < r < r2 or r2 < r < r1
+                    same_col = c1 == c2 and c == c1
+                    between_rows = r1 < r < r2 or r2 < r < r1
 
-                        if same_row and between_cols or same_col and between_rows:
-                            line = out[
-                                min(r1, r2): max(r1, r2) + 1,
-                                min(c1, c2): max(c1, c2) + 1,
-                            ]
-                            color, count = np.unique(line, return_counts=True)
+                    if same_row and between_cols or same_col and between_rows:
+                        line = out[
+                            min(r1, r2) : max(r1, r2) + 1,
+                            min(c1, c2) : max(c1, c2) + 1,
+                        ]
+                        color, count = np.unique(line, return_counts=True)
 
-                            if (
-                                count[color == color_star] > 2
-                            ):  # More than 2 red -> a star blocks ray
-                                continue
-                            elif count[color == 0] == 0:  # No black, no place for ray
-                                continue
+                        if (
+                            count[color == color_star] > 2
+                        ):  # More than 2 red -> a star blocks ray
+                            continue
+                        elif count[color == 0] == 0:  # No black, no place for ray
+                            continue
 
-                            else:
-                                out[r, c] = line_color
+                        else:
+                            out[r, c] = color1
 
-        return out
-
-    return _connect_stars
-
-
-def _solve_28e73c20_candidates():
-    return [
-        _make_solve_28e73c20(fill_color, start_corner, turn_direction)
-        for fill_color in range(1, 10)
-        for start_corner in range(4)
-        for turn_direction in (1, -1)
-    ]
-
-
-def _solve_0520fde7_candidates():
-    return _color_variants(_make_solve_0520fde7, 2)
+    return out
 
 
 def _candidates():
@@ -877,7 +827,7 @@ def _candidates():
         _hollow,
         _mark_blocks,
         _AND_left_right,
-        *_solve_b1948b0a_candidates(),
+        _solve_b1948b0a,
         _rotate_180,
         _rotate_90_left,
         _mirror_bottom_half,
@@ -885,8 +835,8 @@ def _candidates():
         _top_bottom_shared_black_to_black_else_green,
         _diagonal_cross,
         _move_dots_to_matching_border,
-        *_solve_28e73c20_candidates(),
-        *_solve_0520fde7_candidates(),
+        _solve_28e73c20,
+        _solve_0520fde7,
         _mask_gray_w_input_color,
         _cutout_recolor_largest_block_outside_color,
         _diag_from_red_blue,
@@ -902,11 +852,6 @@ def _candidates():
         _solve_b2862040,
         _solve_9af7a82c,
         _solve_dc433765,
-    ]
-
-
-def _d_candidates():
-    return [
         _d_expand_row_to_diagonal_waves,
         _d_3x3_rotate_tile,
         _d_xor_top_bottom_to_six,
@@ -915,22 +860,33 @@ def _d_candidates():
         _d_solve_992798f6,
         _d_solve_d931c21c,
         _d_overlay_if_fits_holes,
-        *[_make_connect_stars(line_color) for line_color in range(1, 10)],
+        _connect_stars,
         _count_square_colors,
-        *[_make_solve_bcb3040b(cross_color) for cross_color in range(1, 10)],
+        _solve_bcb3040b,
     ]
 
 
-def _all_candidates():
-    return [
-        *[
-            candidate
-            for candidate in _candidates()
-            if "_solve_28e73c20" not in candidate.__name__
-        ],
-        *_d_candidates(),
-        *_solve_28e73c20_candidates(),
-    ]
+def _find_matching_transform(train, candidates):
+    for transform in candidates:
+        try:
+            if all(np.array_equal(transform(inp), out) for inp, out in train):
+                return transform
+        except Exception:
+            pass
+
+    # The first parameter is the grid. Any remaining parameters are colors.
+    for transform in candidates:
+        n_parameters = len(inspect.signature(transform).parameters)
+        if n_parameters not in (2, 3, 4):
+            continue
+        for color_transform in _color_variants(transform, n_parameters - 1):
+            try:
+                if all(np.array_equal(color_transform(inp), out) for inp, out in train):
+                    return color_transform
+            except Exception:
+                pass
+
+    return None
 
 
 def _solve_with_candidates(training_sets, test_grid, candidates):
@@ -938,54 +894,38 @@ def _solve_with_candidates(training_sets, test_grid, candidates):
         (pair.get_input_data().data(), pair.get_output_data().data())
         for pair in training_sets
     ]
-    test = np.asarray(test_grid)
-
-    for transform in candidates:
-        try:
-            works = True
-            for inp, out in train:
-                if not np.array_equal(transform(inp), out):
-                    works = False
-                    break
-            if works:
-                return transform(test)
-            else:
-                pass
-        except:
-            # print(f"Error with transform: {transform} on {test} with train {train}")
-            pass
-    return None
-
-
-def solve_milestone_B_dumb(training_sets, test_grid):
-    return _solve_with_candidates(training_sets, test_grid, _candidates())
-
-
-def solve_milestone_D_dumb(training_sets, test_grid):
-    return _solve_with_candidates(training_sets, test_grid, _d_candidates())
+    transform = _find_matching_transform(train, candidates)
+    if transform is None:
+        return None
+    return transform(np.asarray(test_grid))
 
 
 def solve_all_milestones_dumb(training_sets, test_grid):
-    return _solve_with_candidates(training_sets, test_grid, _all_candidates())
-
-
-def solve_milestone_B_smart(training_sets, test_grid):
-    # TODO: Define  transformation as classes, then do some embedding on it and then train a small calssifier on it.
-    # Embedding is probably just  a description of matrixes, such  as it it smaller, did the color change etc etc etc
-    # probably a lot of booleans with then some floats for e.g. the ratio of colors etc etc etc.
-    pass
+    return _solve_with_candidates(training_sets, test_grid, _candidates())
 
 
 if __name__ == "__main__":
+    import glob
     import json
+    import os
 
-    with open("Milestones/C/dc433765.pdf") as f:
-        task = json.load(f)
+    for path in sorted(glob.glob("Milestones/*/*.json")):
+        with open(path) as f:
+            task = json.load(f)
 
-    for i, pair in enumerate(task["train"]):
-        a = np.array(pair["input"])
-        expected = np.array(pair["output"])
-        result = _solve_dc433765(3)(a)
-        print(f"train {i}:", "OK" if np.array_equal(result, expected) else "FAIL")
-        print(result)
-        break
+        name = os.path.splitext(os.path.basename(path))[0]
+        train = [
+            (np.array(pair["input"]), np.array(pair["output"]))
+            for pair in task["train"]
+        ]
+
+        transform = _find_matching_transform(train, _candidates())
+        solved = transform is not None and all(
+            np.array_equal(
+                transform(np.array(pair["input"])),
+                np.array(pair["output"]),
+            )
+            for pair in task["test"]
+        )
+
+        print(f"{name}: {'OK' if solved else 'FAIL'}")
