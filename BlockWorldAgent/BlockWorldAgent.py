@@ -74,9 +74,21 @@ class BlockWorldAgent:
         score_before = self._score(current_arrangement, goal_arrangement)
 
         new_arrangement = copy.deepcopy(current_arrangement)
-        block, target = move
 
-        # Check if block is on top of a stack, else we cant move it
+        new_arrangement = self._move_block(new_arrangement, move)
+        score_after = self._score(new_arrangement, goal_arrangement)
+
+        return score_after - score_before
+
+
+    def _arrangement_is_goal(self, current_arrangement, goal_arrangement):
+        return sorted(current_arrangement) == sorted(goal_arrangement)
+
+
+    def _move_block(self, current_arrangement, move):
+        new_arrangement = copy.deepcopy(current_arrangement)
+        block, target = move
+         # Check if block is on top of a stack, else we cant move it
         for stack in new_arrangement:
             if stack[-1] == block: # Technicall,y it's only valid moves, so this we dont need but we.
                 stack.pop()
@@ -95,14 +107,9 @@ class BlockWorldAgent:
                     stack.append(block)
                     break
 
-        score_after = self._score(new_arrangement, goal_arrangement)
-
-        return score_after - score_before
-
-    def _arrangement_is_goal(self, current_arrangement, goal_arrangement):
-        return sorted(current_arrangement) == sorted(goal_arrangement)
-
-    def solve(self, initial_arrangement, goal_arrangement):
+        return new_arrangement
+    
+    def solve(self, initial_arrangement, goal_arrangement, visited=None):
         # Add your code here! Your solve method should receive
         # as input two arrangements of blocks. The arrangements
         # will be given as lists of lists. The first item in each
@@ -133,64 +140,68 @@ class BlockWorldAgent:
         # The idea is quite simple:
         # Move the blocks so that they are closer to the goal position. If there is only step backwards, put them on the table, until there is a move 
         # Which brings us closer to the goal. This is done with a scoring function. 
-
+        if self._arrangement_is_goal(initial_arrangement, goal_arrangement):
+            return []
 
         current_arrangement = copy.deepcopy(initial_arrangement)
-        moves = []
+        state = sorted(current_arrangement)
+        # List not hashable
+        state = tuple(tuple(stack) for stack in state)
 
-        while not self._arrangement_is_goal(current_arrangement, goal_arrangement):
-            possible_moves = self._generate_moves(current_arrangement)
+        if visited is None:
+            visited = set()
 
-            best_moves = []
-            best_improvement = -float("inf")
+        if state in visited:
+            return None
+        
+        visited = copy.deepcopy(visited)
+        visited.add(state)
 
-            # Check all possible moves and keep the once with the best score OR one with moves it to the table.
-            for move in possible_moves:
-                improvement = self._score_diff_after_move(
-                    current_arrangement, move, goal_arrangement
-                )
+        possible_moves = self._generate_moves(current_arrangement)
 
-                if improvement > best_improvement:
-                    best_improvement = improvement
-                    best_moves = [move]
-                elif improvement == best_improvement:
-                    best_moves.append(move)
+        best_moves = []
+        best_improvement = -float("inf")
 
-                # Check which one to take. If there is a move to a table, take that one.
-                best_move = None
-                for move in best_moves:
-                    if move[1] == "Table":
-                        best_move = move
-                        break
+        # Check all possible moves and keep the once with the best score OR one with moves it to the table.
+        for move in possible_moves:
+            improvement = self._score_diff_after_move(
+                current_arrangement, move, goal_arrangement
+            )
 
-                # If there is no best move with table, take the first one. Should never happen, I think?
-                if best_move is None:
-                    best_move = best_moves[0]
+            if improvement > best_improvement:
+                best_improvement = improvement
+                best_moves = [move]
+            elif improvement == best_improvement:
+                best_moves.append(move)
 
-            block, target = best_move
+        # CURRENTLy UNUSED BECAUSE IT TAKES TOO MUCH TIME.. 
+        # Probably some more complex approach is needed. To avoid dynamic programming, just pick the one which puts a block on the table.
+        # Sometimes, there are ties... but thanks to dynamic programming, we can still solve it. 
+        # This is because I  saw that on gradscope, we need to do some minimal BFS because without if, the solution is not always optimal.
+        
+        best_moves_tiebreaker = []
+        # Fix to avoid dynamic programming, which is wayy to slow... Sadly..
+        for best_move in best_moves:
+            if best_move[1] == "Table":
+                best_moves = [best_move]
+                break
+        if not len(best_moves) == 1:
+            # Unsure if this is correct
+            best_moves = [best_moves[0]]
+        for best_move in best_moves:
 
-            # Move the block to the target
-            for stack in current_arrangement:
-                if stack[-1] == block:
-                    stack.pop()
+            new_tie_breaker_arr = self._move_block(current_arrangement, best_move)
+            moves_tie = self.solve(new_tie_breaker_arr, goal_arrangement, visited)
 
-                    if len(stack) == 0:  # Remove if stack is now empty
-                        current_arrangement.remove(stack)
+            if moves_tie is None:
+                continue
 
-                    break
+            branch = [best_move] + moves_tie
+            best_moves_tiebreaker.append(branch)
 
-            # Place the block on top of the target
-            if target == "Table":
-                current_arrangement.append([block])
-            else:
-                # Place it on top of the target block. Should always work because we generate only valid moves
-                # So it's a smart generator.
-                for stack in current_arrangement:
-                    if stack[-1] == target:
-                        stack.append(block)
-                        break
+        if len(best_moves_tiebreaker) == 0:
+            # No valid states to visit, depth is reached
+            return None
 
-            moves.append(best_move)
-            print(f"Moved {block} to {target}")
-
-        return moves
+        return min(best_moves_tiebreaker, key=len)
+        
