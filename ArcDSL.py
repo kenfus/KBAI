@@ -11,11 +11,33 @@ def _color_variants(transform, n_colors):
             return [partial(transform, **kwargs)]
 
         variants = []
-        for color in range(1, 10):
+        for color in range(0, 10):
             variants.extend(build((*colors, color)))
         return variants
 
     return build(())
+
+def _flood_fill(start, seen, is_valid):
+    todo = [start]
+    block = []
+    seen.add(start)
+
+    # While there are cells of this block, "grow it"
+    while todo:
+        x, y = todo.pop()
+        block.append((x, y))
+
+        # Make it "grow" in 4 directions, over and  over
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+
+            if (nx, ny) in seen or not is_valid(nx, ny):
+                continue
+
+            seen.add((nx, ny))
+            todo.append((nx, ny))
+
+    return block
 
 
 def _find_touching_blocks(a, same_color=True):
@@ -32,28 +54,14 @@ def _find_touching_blocks(a, same_color=True):
                 continue
 
             color = padded[r, c]
-            todo = [(r, c)]
-            block = []
-            seen.add((r, c))
 
-            # While there are cells of this block, "grow it"
-            while todo:
-                x, y = todo.pop()
-                block.append((x - 1, y - 1))
+            def is_valid(nx, ny, color=color):
+                if padded[nx, ny] == 0:
+                    return False
+                return not same_color or padded[nx, ny] == color
 
-                # Make it "grow" in 4 directions, over and  over
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = x + dx, y + dy
-
-                    if (nx, ny) in seen or padded[nx, ny] == 0:
-                        continue
-                    if same_color and padded[nx, ny] != color:
-                        continue
-
-                    seen.add((nx, ny))
-                    todo.append((nx, ny))
-
-            blocks.append((int(color), block))
+            block = _flood_fill((r, c), seen, is_valid)
+            blocks.append((int(color), [(x - 1, y - 1) for x, y in block]))
 
     return blocks
 
@@ -115,15 +123,12 @@ def _AND_top_bot(a, yes=3, no=0):
     return out
 
 
-def _largest_box_cutout(a):
+def _largest_box_cutout(a, color1=0):
     # 1cf80156
-    blocks = [block for _, block in _find_touching_blocks(a)]
-    biggest_block = blocks[0]
-    for block in blocks:
-        if len(block) > len(biggest_block):
-            biggest_block = block
+    non_color = np.argwhere(a != color1)
+    r0, r1 = non_color[:, 0].min(), non_color[:, 0].max()
+    c0, c1 = non_color[:, 1].min(), non_color[:, 1].max()
 
-    r0, r1, c0, c1 = _box(biggest_block)
     return a[r0 : r1 + 1, c0 : c1 + 1]
 
 
@@ -225,12 +230,6 @@ def _rotate_90_left(a):
     return np.rot90(a, 1)
 
 
-def _mirror_bottom_half(a):
-    # f25ffba3
-    bottom = a[a.shape[0] // 2 :]
-    return np.vstack((np.flipud(bottom), bottom))
-
-
 def _top_bottom_shared_black_to_green(a):
     # 6430c8c4
     return _AND_top_bot(a, yes=3, no=0)
@@ -258,7 +257,7 @@ def _diagonal_cross(a):
     return out
 
 
-def _move_dots_to_matching_border(a):
+def _move_dots_to_matching_border(a, color1=0):
     # d687bc17
     out = a.copy()
     inside = a[1:-1, 1:-1]
@@ -269,14 +268,12 @@ def _move_dots_to_matching_border(a):
     down_color = a[-1, 1]
 
     for color in np.unique(inside):
-        if color == 0:
-            continue
         blocks = np.argwhere(inside == color)
         for block in blocks:
             r, c = block
             r += 1
             c += 1
-            out[r, c] = 0
+            out[r, c] = color1
 
             if color == left_color:
                 out[r, 1] = color
@@ -292,12 +289,12 @@ def _move_dots_to_matching_border(a):
     return out
 
 
-def _solve_b2862040(a):
+def _solve_b2862040(a, color1=1, color2=9, color3=8):
     # solves b2862040
     out = a.copy()
 
-    only_blue = np.where(a == 1, 1, 0)
-    for _, block in _find_touching_blocks(only_blue):
+    shapes = np.where(a == color1, color1, 0)
+    for _, block in _find_touching_blocks(shapes):
         r0, r1, c0, c1 = _box(block)
         sub = a[r0 : r1 + 1, c0 : c1 + 1]
         seen = np.zeros(sub.shape)
@@ -306,11 +303,11 @@ def _solve_b2862040(a):
         # Start with all background cells on the edge of this small cro p
         for r in range(sub.shape[0]):
             for c in (0, sub.shape[1] - 1):
-                if sub[r, c] == 9:
+                if sub[r, c] == color2:
                     todo.append((r, c))
         for c in range(sub.shape[1]):
             for r in (0, sub.shape[0] - 1):
-                if sub[r, c] == 9:
+                if sub[r, c] == color2:
                     todo.append((r, c))
 
         while todo:
@@ -323,7 +320,7 @@ def _solve_b2862040(a):
                 if (
                     0 <= nr < sub.shape[0]
                     and 0 <= nc < sub.shape[1]
-                    and sub[nr, nc] == 9
+                    and sub[nr, nc] == color2
                     and not seen[nr, nc]
                 ):
                     todo.append((nr, nc))
@@ -331,18 +328,18 @@ def _solve_b2862040(a):
         closed = False
         for r in range(sub.shape[0]):
             for c in range(sub.shape[1]):
-                if sub[r, c] == 9 and not seen[r, c]:
+                if sub[r, c] == color2 and not seen[r, c]:
                     closed = True
 
         if closed:
             for r, c in block:
-                out[r, c] = 8
+                out[r, c] = color3
 
     return out
 
 
 def _solve_28e73c20(a, color1=3):
-    wall = 1
+    wall = 99
     out = np.pad(a, 1, constant_values=wall)
     directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # clockwise
     r, c = 1, 1  # start in the top-left corner
@@ -374,15 +371,15 @@ def _solve_28e73c20(a, color1=3):
     return out[1:-1, 1:-1]
 
 
-def _solve_0520fde7(a, color1=1, color2=2):
+def _solve_0520fde7(a, color1=0, color2=2, color3=1):
     mid = a.shape[1] // 2
     left = a[:, :mid]
     right = a[:, mid + 1 :]
-    out = np.zeros(left.shape)
+    out = np.ones(left.shape) * color1
 
     for r in range(left.shape[0]):
         for c in range(left.shape[1]):
-            if left[r, c] == color1 and right[r, c] == color1:
+            if left[r, c] ==  right[r, c] == color3:
                 out[r, c] = color2
 
     return out
@@ -499,6 +496,17 @@ def _transpose(a):
     return a.T.copy()
 
 
+def _mirror_up_down(a):
+    return np.flipud(a)
+
+def _mirror_left_right(a):
+    return np.fliplr(a)
+
+def _mirror_bottom_half(a):
+    # f25ffba3
+    bottom = a[a.shape[0] // 2 :]
+    return np.vstack((np.flipud(bottom), bottom))
+
 def _overlay_3_sections(a):
     # solves cf98881b
     sep_cols = [c for c in range(a.shape[1]) if np.all(a[:, c] == 2)]
@@ -522,12 +530,15 @@ def _count_square_colors(a):
     most_common_color = color[np.argmax(counts)]
     other_colors, other_colors_count = (
         color[color != most_common_color],
-        counts[color != most_common_color],
+        counts[color != most_common_color] // 4,
     )
-    out = np.zeros((np.max(other_colors_count), np.max(other_colors_count)))
-    for col in range(out.shape[1]):
-        for row in range(other_colors_count[col]):
-            out[row, col] = other_colors[col]
+    order = np.argsort(other_colors_count)
+    other_colors, other_colors_count = other_colors[order], other_colors_count[order]
+
+    out = np.zeros((len(other_colors), np.max(other_colors_count)))
+    for row in range(out.shape[0]):
+        for col in range(other_colors_count[row]):
+            out[row, col] = other_colors[row]
 
     return out
 
@@ -820,6 +831,74 @@ def _connect_stars(a, color1=1):
 
     return out
 
+def _solve_f35d900a(a):# color1=0, color2=5):
+    color1 = 0
+    color2 = 5
+    colors = np.unique(a[a != color1])
+    dots = np.argwhere(a != color1)
+
+    # Wall to make it simpler
+    a = np.pad(a, 1, constant_values=color1)
+    out = a.copy()
+    dots = dots + 1
+
+    for r, c in dots:
+        correct_color = [color for color in colors if color != a[r, c]][0]
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr == 0 and dc == 0:
+                    continue
+                out[r + dr, c + dc] = correct_color
+    # Dots now have to be connected to each other
+    # Then, make them walk towards each other, one side at a time.
+    # If they overlap, stop.
+    for i in range(len(dots)):
+        for j in range(len(dots)):
+            if i == j:
+                continue
+            r1, c1 = dots[i]
+            r2, c2 = dots[j]
+            if r1 == r2:
+                c1, c2 = c1 + 2, c2 - 2
+                while c1 <= c2:
+                    out[r1, c1] = color2
+                    out[r1, c2] = color2
+                    c1 += 2
+                    c2 -= 2
+            elif c1 == c2:
+                r1, r2 = r1 + 2, r2 - 2
+                while r1 <= r2:
+                    out[r1, c1] = color2
+                    out[r2, c1] = color2
+                    r1 += 2
+                    r2 -= 2
+
+    return out[1:-1, 1:-1]
+
+
+def _solve_7b6016b9(a, color1=0, color2=3, color3=2):
+    # solves 7b6016b9
+    # A straight-line raycast from each side misses rooms that only open up
+    # around a corner, so instead flood-fill (4-connected) from every
+    # background cell touching the border - that's the true "outside".
+    a = a.copy()
+    h, w = a.shape
+    seen = set()
+
+    def is_valid(nr, nc):
+        return 0 <= nr < h and 0 <= nc < w and a[nr, nc] == color1
+
+    border = [(r, c) for r in range(h) for c in (0, w - 1)]
+    border += [(r, c) for c in range(w) for r in (0, h - 1)]
+
+    for start in border:
+        if start not in seen and a[start] == color1:
+            for r, c in _flood_fill(start, seen, is_valid):
+                a[r, c] = color2
+
+    a[a == color1] = color3
+    return a
+
 
 def _candidates():
     return [
@@ -863,6 +942,8 @@ def _candidates():
         _connect_stars,
         _count_square_colors,
         _solve_bcb3040b,
+        _solve_f35d900a,
+        _solve_7b6016b9
     ]
 
 
@@ -883,6 +964,30 @@ def _find_matching_transform(train, candidates):
             try:
                 if all(np.array_equal(color_transform(inp), out) for inp, out in train):
                     return color_transform
+            except Exception:
+                pass
+
+
+    # If this also fails, try to do a rotation of mirror, transpose, rotation etc. 
+    for main_transform in candidates:
+        n_parameters = len(inspect.signature(main_transform).parameters)
+        if n_parameters not in (2, 3, 4, 5):
+            continue
+        for color_transform in _color_variants(main_transform, n_parameters - 1):
+            try:
+                # Ugly, rewrrite.
+                for transform in [_rotate_90_left, _rotate_180, _transpose, _mirror_up_down, _mirror_left_right]:
+                    pass_ = True
+                    for inp, out in train:
+                        transformed = color_transform(inp)
+                        transformed = transform(transformed)
+                        if np.array_equal(transformed, out):
+                            pass_ = True
+                        else:
+                            pass_ = False
+                            break
+                    if pass_:
+                        return lambda x: transform(color_transform(x))
             except Exception:
                 pass
 
