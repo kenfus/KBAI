@@ -875,6 +875,177 @@ def _solve_f35d900a(a):# color1=0, color2=5):
 
     return out[1:-1, 1:-1]
 
+def _solve_f8a8fe49(a, color1=0):
+    # solves f8a8fe49
+    out = a.copy()
+    non_bg_cells = np.argwhere(a != color1)
+    r0, r1 = non_bg_cells[:, 0].min(), non_bg_cells[:, 0].max()
+    c0, c1 = non_bg_cells[:, 1].min(), non_bg_cells[:, 1].max()
+    # Assume its horizontal, our transformation will capture the rest
+    mid_line = (r0 + r1) // 2
+    # The box is horizontal when its top edge is one solid bar, else its vertical
+    horizontal = np.all(a[r0, c0 : c1 + 1] != color1)
+    rotated = False
+    if not horizontal:
+        a = np.rot90(a)
+        rotated = True
+
+    for r, c in np.argwhere(a != color1):
+        if not (r0 < r < r1 and c0 < c < c1):
+            continue
+        out[r, c] = color1
+        wall = c0 if c <= mid_line else c1
+        out[r, 2 * wall - c] = a[r, c]
+
+    if rotated:
+        out = np.rot90(out, -1)
+    return out
+
+
+def _solve_67c52801(a, color1=0):
+    # solves 67c52801
+    out = a.copy()
+    h, w = a.shape
+    wall_row = h - 1
+    wall_color = a[wall_row, 0]
+    tooth = wall_row - 1
+
+    # Get the holes in the wall, sort them by width, so then we know which to fill first.
+    holes = []
+    gap = []
+    for c in range(w):
+        if a[tooth, c] == color1:
+            gap.append(c)
+        elif gap:
+            holes.append(gap)
+            gap = []
+    if gap:
+        holes.append(gap)
+
+    holes.sort(key=len, reverse=True)
+
+    # Get thge blocks abiove th ewall. 
+    blocks = []
+    for color, cells in _find_touching_blocks(a):
+        if color == wall_color or color == color1:
+            continue
+        rows = [r for r, _ in cells]
+        cols = [cc for _, cc in cells]
+        blocks.append((len(cells), int(color)))
+        out[min(rows) : max(rows) + 1, min(cols) : max(cols) + 1] = color1
+    blocks.sort(reverse=True)
+
+    # biggest block drops into the widest hole, standing on top of the wall
+    for hole, (area, color) in zip(holes, blocks):
+        width = len(hole)
+        height = area // width
+        left = hole[0]
+        out[wall_row - height : wall_row, left : left + width] = color
+
+    return out
+
+
+def _solve_18419cfa(a, color1=0, color2=8, color3=2):
+    # solves 18419cfa
+    out = a.copy()
+    # Every 8-frame hides a half-drawn 2-shape. Grab each frame, look at the
+    # little shape sitting inside it, and mirror it across the frame center -
+    # sideways if it hangs left/right, downwards if it hangs up/down.
+    for color, cells in _find_touching_blocks(a):
+        if color != color2:
+            continue
+        r0, r1, c0, c1 = _box(cells)
+        block = out[r0 : r1 + 1, c0 : c1 + 1].copy()
+
+        # Where does the shape sit? If its rows are centred, it hangs left/right;
+        # otherwise it hangs up/down.
+        shape = np.argwhere(block == color3)
+        if shape.size == 0:
+            continue
+        rows = shape[:, 0]
+        hangs_up_down = rows.min() + rows.max() != block.shape[0] - 1
+
+        # Always mirror left/right. For an up/down shape, rot90 it sideways first,
+        # mirror, then rot90 back.
+        work = np.rot90(block) if hangs_up_down else block
+        work[np.fliplr(work == color3)] = color3
+        block = np.rot90(work, -1) if hangs_up_down else work
+
+        out[r0 : r1 + 1, c0 : c1 + 1] = block
+    return out
+
+
+def _bands(length, walls):
+    # Split 0..length-1 into the runs of indices that are NOT wall lines.
+    bands = []
+    start = None
+    for i in range(length):
+        if i in walls:
+            if start is not None:
+                bands.append((start, i - 1))
+                start = None
+        elif start is None:
+            start = i
+    if start is not None:
+        bands.append((start, length - 1))
+    return bands
+
+
+def _solve_2546ccf6(a, color1=0):
+    # solves 2546ccf6
+    out = a.copy()
+    h, w = a.shape
+
+    # Find the wall colour: scan rows until one is a single colour all the way across.
+    wall = color1
+    for r in range(h):
+        if np.all(a[r] == a[r, 0]) and a[r, 0] != color1:
+            wall = a[r, 0]
+            break
+
+    # The wall lines are the full rows / full columns of that colour; the panels
+    # are the rectangles in between.
+    wall_rows = [r for r in range(h) if np.all(a[r] == wall)]
+    wall_cols = [c for c in range(w) if np.all(a[:, c] == wall)]
+    row_bands = _bands(h, wall_rows)
+    col_bands = _bands(w, wall_cols)
+
+    # The shape colour inside a panel, or None when the panel is empty.
+    def panel_color(r0, r1, c0, c1):
+        for r in range(r0, r1 + 1):
+            for c in range(c0, c1 + 1):
+                if a[r, c] != color1 and a[r, c] != wall:
+                    return a[r, c]
+        return None
+
+    # Every empty panel that is the missing corner of a 2x2 block has two
+    # same-coloured neighbours meeting at that corner. Copy the horizontal
+    # neighbour in, mirrored left/right.
+    for i, (r0, r1) in enumerate(row_bands):
+        for j, (c0, c1) in enumerate(col_bands):
+            if panel_color(r0, r1, c0, c1) is not None:
+                continue
+
+            up = panel_color(*row_bands[i - 1], c0, c1) if i > 0 else None
+            down = panel_color(*row_bands[i + 1], c0, c1) if i < len(row_bands) - 1 else None
+            left = panel_color(r0, r1, *col_bands[j - 1]) if j > 0 else None
+            right = panel_color(r0, r1, *col_bands[j + 1]) if j < len(col_bands) - 1 else None
+
+            if left is not None and up == left:
+                sc0, sc1 = col_bands[j - 1]
+            elif left is not None and down == left:
+                sc0, sc1 = col_bands[j - 1]
+            elif right is not None and up == right:
+                sc0, sc1 = col_bands[j + 1]
+            elif right is not None and down == right:
+                sc0, sc1 = col_bands[j + 1]
+            else:
+                continue
+
+            out[r0 : r1 + 1, c0 : c1 + 1] = np.fliplr(a[r0 : r1 + 1, sc0 : sc1 + 1])
+
+    return out
+
 
 def _solve_7b6016b9(a, color1=0, color2=3, color3=2):
     # solves 7b6016b9
@@ -943,7 +1114,11 @@ def _candidates():
         _count_square_colors,
         _solve_bcb3040b,
         _solve_f35d900a,
-        _solve_7b6016b9
+        _solve_7b6016b9,
+        _solve_f8a8fe49,
+        _solve_18419cfa,
+        _solve_2546ccf6,
+        _solve_67c52801
     ]
 
 
