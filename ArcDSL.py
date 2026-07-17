@@ -7,12 +7,19 @@ import numpy as np
 def _color_variants(transform, n_colors):
     def build(colors):
         if len(colors) == n_colors:
-            kwargs = {f"color{i + 1}": color for i, color in enumerate(colors)}
+            kwargs = {}
+            for i in range(len(colors)):
+                name = "color" + str(i + 1)
+                kwargs[name] = colors[i]
             return [partial(transform, **kwargs)]
 
         variants = []
         for color in range(0, 10):
-            variants.extend(build((*colors, color)))
+            new_colors = list(colors)
+            new_colors.append(color)
+            new_variants = build(tuple(new_colors))
+            for variant in new_variants:
+                variants.append(variant)
         return variants
 
     return build(())
@@ -311,6 +318,7 @@ def _solve_b2862040(a, color1=1, color2=9, color3=8):
                 if sub[r, c] == color2:
                     todo.append((r, c))
 
+        # A floopd fill
         while todo:
             r, c = todo.pop()
             if seen[r, c]:
@@ -552,8 +560,15 @@ def _solve_9af7a82c(a):
     colors, counts = np.unique(a[a != 0], return_counts=True)
     order = np.argsort(-counts)
     colors, counts = colors[order], counts[order]
-    rows = np.arange(np.max(counts))[:, None]
-    return np.where(rows < counts, colors, 0)
+
+    height = np.max(counts)
+    out = np.zeros((height, len(colors)))
+
+    for c in range(len(colors)):
+        for r in range(counts[c]):
+            out[r, c] = colors[c]
+
+    return out
 
 
 def _d_expand_row_to_diagonal_waves(a):
@@ -655,6 +670,61 @@ def _d_count_dots_inside_box(a):
             dots_added += 1
             if dots_added == n_dots:
                 return out
+
+
+def _get_colors_from_block(a, block):
+    block_colors = np.zeros(len(block), dtype=a.dtype)
+    i = 0
+    for r, c in block:
+        block_colors[i] = a[r, c]
+        i += 1
+
+    return np.unique(block_colors)
+
+
+def _d_solve_e9b4f6fc(a, color1=0):
+    # solves e9b4f6fc
+    # Make everything except the empty space one color, then we can reuse the block finder
+    found_blocks = _find_touching_blocks(a != color1)
+    blocks = []
+    rectangle = None
+
+    for _, block in found_blocks:
+        blocks.append(block)
+        if rectangle is None:
+            rectangle = block
+        elif len(block) > len(rectangle):
+            rectangle = block
+
+    r0, r1, c0, c1 = _box(rectangle)
+    out = a[r0 : r1 + 1, c0 : c1 + 1].copy()
+    colors_in_rectangle = np.unique(out)
+
+    # Loop through each rectagne, each color and then find this color into the double blocks
+    # And recolor the other color inside the double blocks.
+    for pair in blocks:
+        if pair == rectangle or len(pair) != 2:
+            continue
+
+        pair_colors = _get_colors_from_block(a, pair)
+        if len(pair_colors) != 2:
+            continue
+
+        for color in pair_colors:
+            color_is_in_rectangle = np.any(colors_in_rectangle == color)
+            if not color_is_in_rectangle:
+                continue
+
+            other_color = pair_colors[0]
+            if other_color == color:
+                other_color = pair_colors[1]
+
+            rows, cols = np.where(out == color)
+            for i in range(len(rows)):
+                out[rows[i], cols[i]] = other_color
+            break
+
+    return out
 
 
 def _d_solve_992798f6(a):
@@ -1196,6 +1266,7 @@ def _candidates():
         _d_xor_top_bottom_to_six,
         _or,
         _d_count_dots_inside_box,
+        _d_solve_e9b4f6fc,
         _d_solve_992798f6,
         _d_solve_d931c21c,
         _d_overlay_if_fits_holes,
@@ -1212,13 +1283,23 @@ def _candidates():
     ]
 
 
+def _transform_matches(transform, train):
+    for inp, expected in train:
+        try:
+            answer = transform(inp)
+        except Exception:
+            return False
+
+        if not np.array_equal(answer, expected):
+            return False
+
+    return True
+
+
 def _find_matching_transform(train, candidates):
     for transform in candidates:
-        try:
-            if all(np.array_equal(transform(inp), out) for inp, out in train):
-                return transform
-        except Exception:
-            pass
+        if _transform_matches(transform, train):
+            return transform
 
     # The first parameter is the grid. Any remaining parameters are colors.
     for transform in candidates:
@@ -1226,11 +1307,8 @@ def _find_matching_transform(train, candidates):
         if n_parameters not in (2, 3, 4):
             continue
         for color_transform in _color_variants(transform, n_parameters - 1):
-            try:
-                if all(np.array_equal(color_transform(inp), out) for inp, out in train):
-                    return color_transform
-            except Exception:
-                pass
+            if _transform_matches(color_transform, train):
+                return color_transform
 
     # If this also fails, try to do a rotation of mirror, transpose, rotation etc.
     for main_transform in candidates:
@@ -1238,37 +1316,31 @@ def _find_matching_transform(train, candidates):
         if n_parameters not in (2, 3, 4, 5):
             continue
         for color_transform in _color_variants(main_transform, n_parameters - 1):
-            try:
-                # Ugly, rewrrite.
-                for transform in [
-                    _rotate_90_left,
-                    _rotate_180,
-                    _transpose,
-                    _mirror_up_down,
-                    _mirror_left_right,
-                ]:
-                    pass_ = True
-                    for inp, out in train:
-                        transformed = color_transform(inp)
-                        transformed = transform(transformed)
-                        if np.array_equal(transformed, out):
-                            pass_ = True
-                        else:
-                            pass_ = False
-                            break
-                    if pass_:
-                        return lambda x: transform(color_transform(x))
-            except Exception:
-                pass
+            for transform in [
+                _rotate_90_left,
+                _rotate_180,
+                _transpose,
+                _mirror_up_down,
+                _mirror_left_right,
+            ]:
+
+                def both(a, first=color_transform, second=transform):
+                    a = first(a)
+                    return second(a)
+
+                if _transform_matches(both, train):
+                    return both
 
     return None
 
 
 def _solve_with_candidates(training_sets, test_grid, candidates):
-    train = [
-        (pair.get_input_data().data(), pair.get_output_data().data())
-        for pair in training_sets
-    ]
+    train = []
+    for pair in training_sets:
+        inp = pair.get_input_data().data()
+        out = pair.get_output_data().data()
+        train.append((inp, out))
+
     transform = _find_matching_transform(train, candidates)
     if transform is None:
         return None
