@@ -283,14 +283,27 @@ def _move_dots_to_matching_border(a, color1=0):
             c += 1
             out[r, c] = color1
 
+            # If the spot at the border is taken already, stack on top instead.
             if color == left_color:
-                out[r, 1] = color
+                cc = 1
+                while out[r, cc] != color1:
+                    cc += 1
+                out[r, cc] = color
             elif color == right_color:
-                out[r, a.shape[1] - 2] = color
+                cc = a.shape[1] - 2
+                while out[r, cc] != color1:
+                    cc -= 1
+                out[r, cc] = color
             elif color == up_color:
-                out[1, c] = color
+                rr = 1
+                while out[rr, c] != color1:
+                    rr += 1
+                out[rr, c] = color
             elif color == down_color:
-                out[a.shape[0] - 2, c] = color
+                rr = a.shape[0] - 2
+                while out[rr, c] != color1:
+                    rr -= 1
+                out[rr, c] = color
             else:
                 pass
 
@@ -481,11 +494,11 @@ def _xor_halves_to_green(a):
     return out
 
 
-def _overlay_halves_at_5(a):
+def _overlay_halves_at_5(a, color1=0):
     # solves e98196ab
-    sep = np.where(np.all(a == 5, axis=1))[0][0]
-    top, bot = a[:sep], a[sep + 1 :]
-    return np.where(top != 0, top, bot)
+    mid = a.shape[0] // 2
+    top, bot = a[:mid], a[mid + 1 :]
+    return np.where(top != color1, top, bot)
 
 
 def _staircase(a):
@@ -727,11 +740,11 @@ def _d_solve_e9b4f6fc(a, color1=0):
     return out
 
 
-def _d_solve_992798f6(a):
+def _d_solve_992798f6(a, color1=2, color2=1, color3=3):
     # solves 992798f6
     out = a.copy()
-    red = np.argwhere(a == 2)[0]
-    blue = np.argwhere(a == 1)[0]
+    red = np.argwhere(a == color1)[0]
+    blue = np.argwhere(a == color2)[0]
     diag = np.sign(blue - red)
     pos = red + diag
     diff = blue - pos
@@ -742,11 +755,11 @@ def _d_solve_992798f6(a):
         straight = np.array([0, diag[1]])
 
     while abs(blue[0] - pos[0]) != abs(blue[1] - pos[1]):
-        out[pos[0], pos[1]] = 3
+        out[pos[0], pos[1]] = color3
         pos += straight
 
     while np.any(pos != blue):
-        out[pos[0], pos[1]] = 3
+        out[pos[0], pos[1]] = color3
         pos += diag
 
     return out
@@ -926,13 +939,15 @@ def _solve_f8a8fe49(a, color1=0):
     r0, r1 = non_bg_cells[:, 0].min(), non_bg_cells[:, 0].max()
     c0, c1 = non_bg_cells[:, 1].min(), non_bg_cells[:, 1].max()
     mid_line = (r0 + r1) // 2
+
     # The box is horizontal when its top edge is one solid bar, else its vertical
     horizontal = np.all(a[r0, c0 : c1 + 1] != color1)
     rotated = False
     if not horizontal:
         a = np.rot90(a)
         rotated = True
-
+    
+    # Fill the box with color the mirror th eother side.
     for r, c in np.argwhere(a != color1):
         if not (r0 < r < r1 and c0 < c < c1):
             continue
