@@ -684,18 +684,18 @@ def _d_solve_992798f6(a):
 
 def _d_solve_d931c21c(a, color1=1, color2=3, color3=2):
     # solves d931c21c
-    # Closed shapes get a green lining inside and a red halo outside,
-    # open shapes stay as they are.
+    # Closed shapes get a green lining inside and a red halo outside
+    # open shapes just stay like they are
     out = a.copy()
 
-    # No wall colour anywhere, nothing to do. Keeps the color sweep fast.
+    # No wall color anywhere, nothing to do, keeps the color sweep fast
     if np.all(a != color1):
         return out
 
-    # Everything the flood from the border can not reach is inside a closed shape.
+    # Everything the flood from the border cant reach is inside a closed shape
     inside = ~_outside_mask(a, color1) & (a != color1)
 
-    # Only the walls of closed shapes count, open ones enclose nothing.
+    # Only walls of closed shapes count, open ones dont enclose anything
     walls = np.zeros(a.shape, dtype=bool)
     for color, cells in _find_touching_blocks(a):
         block = _to_mask(cells, a.shape)
@@ -1053,8 +1053,8 @@ def _solve_7b6016b9(a, color1=0, color2=3, color3=2):
 
 
 def _outside_mask(a, wall):
-    # Everything reachable from outside the grid; the wall colour blocks the way.
-    # Pad first, then one flood fill from the corner walks the whole outside.
+    # Everything reachable from outside the grid, the wall color blocks the way
+    # Pad first, then one ff from the corner walks around the whole outside
     padded = np.pad(a, 1, constant_values=-1)
     h, w = padded.shape
 
@@ -1069,8 +1069,8 @@ def _outside_mask(a, wall):
 
 
 def _grow(mask, diagonal=False):
-    # Grow the mask by one cell in every direction.
-    # Trick hehe from _mark_blocks, pad first, then no check about bounds.
+    # Grow the mask by one cell in evrey direction
+    # Trick hehe from _mark_blocks, pad first, then no check about bounds
     padded = np.pad(mask, 1)
     grown = padded.copy()
 
@@ -1085,7 +1085,7 @@ def _grow(mask, diagonal=False):
 
 
 def _to_mask(cells, shape):
-    # The cell list of a block from _find_touching_blocks as a mask.
+    # Cell list from _find_touching_blocks as a mask
     mask = np.zeros(shape, dtype=bool)
     for r, c in cells:
         mask[r, c] = True
@@ -1093,7 +1093,7 @@ def _to_mask(cells, shape):
 
 
 def _rooms(mask):
-    # Split a mask into its touching groups of cells.
+    # Split a mask into its touching groups
     h, w = mask.shape
     seen = set()
     rooms = []
@@ -1109,7 +1109,7 @@ def _rooms(mask):
 
 
 def _remove_lone_pixels(a, color1=0):
-    # A pixel that touches no cell of its own colour is just noise.
+    # A pixel wich touches nothing of its own color is just noise
     out = a.copy()
     for _, cells in _find_touching_blocks(a):
         if len(cells) == 1:
@@ -1126,27 +1126,27 @@ def _solve_4b6b68e5(a, color1=0):
         if wall == color1:
             continue
 
-        # Everything the outside flood cannot reach is boxed in by this colour.
+        # Everything the outside flood cant reach is boxed in by this color
         outside = _outside_mask(a, wall)
         inside = ~outside
 
-        # This colour boxes nothing in, move on.
+        # This color boxes nothing in, skip
         if not np.any(inside & (a != wall)):
             continue
 
-        # Walls sitting on the grid border touch the outside too.
+        # Walls sitting on the grid border touch the outside too
         near_outside = _grow(outside)
         near_outside[[0, -1], :] = True
         near_outside[:, [0, -1]] = True
 
-        # A wall that reaches the outside is a real box and stays whole (even
-        # its double-thick cells). A wall blob trapped inside is just noise.
+        # A wall that reaches the outside is a real box and stays whole, even the
+        # double thick cells. A wall blob traped inside is just noise
         for color, cells in _find_touching_blocks(a):
             block = _to_mask(cells, a.shape)
             if color == wall and np.any(block & near_outside):
                 inside &= ~block
 
-        # Paint every room with the most common colour of the noise in it.
+        # Paint every room with the most common color of the noise inside
         for room in _rooms(inside):
             rows, cols = np.array(room).T
             noise = a[rows, cols]
