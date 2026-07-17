@@ -49,15 +49,15 @@ class BlockWorldAgent:
 
         # Generate all possible moves from the top block to other blocks or table
         for i, stack in enumerate(current_arrangement_):
-            block_to_move = stack[-1]  # The top block of the current stack are looking at
-
+            block_to_move = stack[
+                -1
+            ]  # The top block of the current stack are looking at
 
             # If block is on top of a stack, you can move it to the table else dont.
             if len(stack) > 1:
                 moves.append((block_to_move, "Table"))
             else:
                 pass
-        
 
             # Move to another stack, ON TO
             for j, target_stack in enumerate(current_arrangement_):
@@ -70,7 +70,7 @@ class BlockWorldAgent:
         return moves
 
     def _score_diff_after_move(self, current_arrangement, move, goal_arrangement):
-        # Based on the score, check if the move is brinning us closer to the goal. 
+        # Based on the score, check if the move is brinning us closer to the goal.
         score_before = self._score(current_arrangement, goal_arrangement)
 
         new_arrangement = copy.deepcopy(current_arrangement)
@@ -80,17 +80,17 @@ class BlockWorldAgent:
 
         return score_after - score_before
 
-
     def _arrangement_is_goal(self, current_arrangement, goal_arrangement):
         return sorted(current_arrangement) == sorted(goal_arrangement)
-
 
     def _move_block(self, current_arrangement, move):
         new_arrangement = copy.deepcopy(current_arrangement)
         block, target = move
-         # Check if block is on top of a stack, else we cant move it
+        # Check if block is on top of a stack, else we cant move it
         for stack in new_arrangement:
-            if stack[-1] == block: # Technicall,y it's only valid moves, so this we dont need but we.
+            if (
+                stack[-1] == block
+            ):  # Technicall,y it's only valid moves, so this we dont need but we.
                 stack.pop()
 
                 if len(stack) == 0:  # Remove if stack is now empty
@@ -108,7 +108,7 @@ class BlockWorldAgent:
                     break
 
         return new_arrangement
-    
+
     def solve(self, initial_arrangement, goal_arrangement, visited=None):
         # Add your code here! Your solve method should receive
         # as input two arrangements of blocks. The arrangements
@@ -136,10 +136,9 @@ class BlockWorldAgent:
         # ("B", "E")
         # ("C", "A")
 
-
         # The idea is quite simple:
-        # Move the blocks so that they are closer to the goal position. If there is only step backwards, put them on the table, until there is a move 
-        # Which brings us closer to the goal. This is done with a scoring function. 
+        # Move the blocks so that they are closer to the goal position. If there is only step backwards, put them on the table, until there is a move
+        # Which brings us closer to the goal. This is done with a scoring function.
         if self._arrangement_is_goal(initial_arrangement, goal_arrangement):
             return []
 
@@ -153,7 +152,7 @@ class BlockWorldAgent:
 
         if state in visited:
             return None
-        
+
         visited = copy.deepcopy(visited)
         visited.add(state)
 
@@ -174,11 +173,11 @@ class BlockWorldAgent:
             elif improvement == best_improvement:
                 best_moves.append(move)
 
-        # CURRENTLy UNUSED BECAUSE IT TAKES TOO MUCH TIME.. 
+        # CURRENTLy UNUSED BECAUSE IT TAKES TOO MUCH TIME..
         # Probably some more complex approach is needed. To avoid dynamic programming, just pick the one which puts a block on the table.
-        # Sometimes, there are ties... but thanks to dynamic programming, we can still solve it. 
+        # Sometimes, there are ties... but thanks to dynamic programming, we can still solve it.
         # This is because I  saw that on gradscope, we need to do some minimal BFS because without if, the solution is not always optimal.
-        
+
         best_moves_tiebreaker = []
         # Fix to avoid dynamic programming, which is wayy to slow... Sadly..
         for best_move in best_moves:
@@ -204,4 +203,3 @@ class BlockWorldAgent:
             return None
 
         return min(best_moves_tiebreaker, key=len)
-        

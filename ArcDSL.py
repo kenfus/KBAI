@@ -17,6 +17,7 @@ def _color_variants(transform, n_colors):
 
     return build(())
 
+
 def _flood_fill(start, seen, is_valid):
     todo = [start]
     block = []
@@ -379,7 +380,7 @@ def _solve_0520fde7(a, color1=0, color2=2, color3=1):
 
     for r in range(left.shape[0]):
         for c in range(left.shape[1]):
-            if left[r, c] ==  right[r, c] == color3:
+            if left[r, c] == right[r, c] == color3:
                 out[r, c] = color2
 
     return out
@@ -499,13 +500,16 @@ def _transpose(a):
 def _mirror_up_down(a):
     return np.flipud(a)
 
+
 def _mirror_left_right(a):
     return np.fliplr(a)
+
 
 def _mirror_bottom_half(a):
     # f25ffba3
     bottom = a[a.shape[0] // 2 :]
     return np.vstack((np.flipud(bottom), bottom))
+
 
 def _overlay_3_sections(a):
     # solves cf98881b
@@ -613,11 +617,6 @@ def _d_xor_top_bottom_to_six(a):
     return out
 
 
-def _fill_with_common_cell_color(a):
-    # solves 4b6b68e5
-    pass
-
-
 def _or(a):
     # solves 195ba7dc
     sep_cols = a.shape[1] // 2
@@ -683,57 +682,30 @@ def _d_solve_992798f6(a):
     return out
 
 
-def _d_solve_d931c21c(a):
+def _d_solve_d931c21c(a, color1=1, color2=3, color3=2):
     # solves d931c21c
+    # Closed shapes get a green lining inside and a red halo outside,
+    # open shapes stay as they are.
     out = a.copy()
-    for _, block in _find_touching_blocks(a):
-        block = np.array(block)
-        r0, c0 = np.maximum(block.min(axis=0) - 1, 0)
-        r1, c1 = np.minimum(block.max(axis=0) + 1, np.array(a.shape) - 1)
-        sub = a[r0 : r1 + 1, c0 : c1 + 1]
-        seen = np.zeros(sub.shape, dtype=bool)
-        todo = []
-        for r in range(sub.shape[0]):
-            for c in (0, sub.shape[1] - 1):
-                if sub[r, c] == 0:
-                    todo.append((r, c))
-        for c in range(sub.shape[1]):
-            for r in (0, sub.shape[0] - 1):
-                if sub[r, c] == 0:
-                    todo.append((r, c))
 
-        while todo:
-            r, c = todo.pop()
-            if seen[r, c]:
-                continue
-            seen[r, c] = True
-            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                nr, nc = r + dr, c + dc
-                if (
-                    0 <= nr < sub.shape[0]
-                    and 0 <= nc < sub.shape[1]
-                    and sub[nr, nc] == 0
-                    and not seen[nr, nc]
-                ):
-                    todo.append((nr, nc))
+    # No wall colour anywhere, nothing to do. Keeps the color sweep fast.
+    if np.all(a != color1):
+        return out
 
-        inside = (sub == 0) & ~seen
-        if not np.any(inside):
-            continue
+    # Everything the flood from the border can not reach is inside a closed shape.
+    inside = ~_outside_mask(a, color1) & (a != color1)
 
-        wall = np.pad(sub == 1, 1)
-        near_wall = np.zeros(sub.shape, dtype=bool)
-        for dr in (-1, 0, 1):
-            for dc in (-1, 0, 1):
-                if dr != 0 or dc != 0:
-                    near_wall |= wall[
-                        1 + dr : 1 + dr + sub.shape[0],
-                        1 + dc : 1 + dc + sub.shape[1],
-                    ]
+    # Only the walls of closed shapes count, open ones enclose nothing.
+    walls = np.zeros(a.shape, dtype=bool)
+    for color, cells in _find_touching_blocks(a):
+        block = _to_mask(cells, a.shape)
+        if color == color1 and np.any(_grow(block) & inside):
+            walls |= block
 
-        patch = out[r0 : r1 + 1, c0 : c1 + 1]
-        patch[(sub == 0) & seen & near_wall] = 2
-        patch[inside & near_wall] = 3
+    # Paint the empty cells next to a wall, diagonals too
+    near_wall = _grow(walls, diagonal=True) & (a != color1)
+    out[near_wall & inside] = color2
+    out[near_wall & ~inside] = color3
 
     return out
 
@@ -831,7 +803,8 @@ def _connect_stars(a, color1=1):
 
     return out
 
-def _solve_f35d900a(a):# color1=0, color2=5):
+
+def _solve_f35d900a(a):  # color1=0, color2=5):
     color1 = 0
     color2 = 5
     colors = np.unique(a[a != color1])
@@ -875,13 +848,13 @@ def _solve_f35d900a(a):# color1=0, color2=5):
 
     return out[1:-1, 1:-1]
 
+
 def _solve_f8a8fe49(a, color1=0):
     # solves f8a8fe49
     out = a.copy()
     non_bg_cells = np.argwhere(a != color1)
     r0, r1 = non_bg_cells[:, 0].min(), non_bg_cells[:, 0].max()
     c0, c1 = non_bg_cells[:, 1].min(), non_bg_cells[:, 1].max()
-    # Assume its horizontal, our transformation will capture the rest
     mid_line = (r0 + r1) // 2
     # The box is horizontal when its top edge is one solid bar, else its vertical
     horizontal = np.all(a[r0, c0 : c1 + 1] != color1)
@@ -894,6 +867,7 @@ def _solve_f8a8fe49(a, color1=0):
         if not (r0 < r < r1 and c0 < c < c1):
             continue
         out[r, c] = color1
+        # Mirror it to the other side.
         wall = c0 if c <= mid_line else c1
         out[r, 2 * wall - c] = a[r, c]
 
@@ -924,7 +898,7 @@ def _solve_67c52801(a, color1=0):
 
     holes.sort(key=len, reverse=True)
 
-    # Get thge blocks abiove th ewall. 
+    # Get thge blocks abiove th ewall.
     blocks = []
     for color, cells in _find_touching_blocks(a):
         if color == wall_color or color == color1:
@@ -949,16 +923,15 @@ def _solve_18419cfa(a, color1=0, color2=8, color3=2):
     # solves 18419cfa
     out = a.copy()
     # Every 8-frame hides a half-drawn 2-shape. Grab each frame, look at the
-    # little shape sitting inside it, and mirror it across the frame center -
-    # sideways if it hangs left/right, downwards if it hangs up/down.
+    # little shape sitting inside it, and mirror it across the frame center
+    # sideways if it hangs horizonal, up down if vertical
     for color, cells in _find_touching_blocks(a):
         if color != color2:
             continue
         r0, r1, c0, c1 = _box(cells)
         block = out[r0 : r1 + 1, c0 : c1 + 1].copy()
 
-        # Where does the shape sit? If its rows are centred, it hangs left/right;
-        # otherwise it hangs up/down.
+        # Where does the shape si,t, verizal or horizotal
         shape = np.argwhere(block == color3)
         if shape.size == 0:
             continue
@@ -1027,9 +1000,17 @@ def _solve_2546ccf6(a, color1=0):
                 continue
 
             up = panel_color(*row_bands[i - 1], c0, c1) if i > 0 else None
-            down = panel_color(*row_bands[i + 1], c0, c1) if i < len(row_bands) - 1 else None
+            down = (
+                panel_color(*row_bands[i + 1], c0, c1)
+                if i < len(row_bands) - 1
+                else None
+            )
             left = panel_color(r0, r1, *col_bands[j - 1]) if j > 0 else None
-            right = panel_color(r0, r1, *col_bands[j + 1]) if j < len(col_bands) - 1 else None
+            right = (
+                panel_color(r0, r1, *col_bands[j + 1])
+                if j < len(col_bands) - 1
+                else None
+            )
 
             if left is not None and up == left:
                 sc0, sc1 = col_bands[j - 1]
@@ -1051,7 +1032,7 @@ def _solve_7b6016b9(a, color1=0, color2=3, color3=2):
     # solves 7b6016b9
     # A straight-line raycast from each side misses rooms that only open up
     # around a corner, so instead flood-fill (4-connected) from every
-    # background cell touching the border - that's the true "outside".
+
     a = a.copy()
     h, w = a.shape
     seen = set()
@@ -1069,6 +1050,114 @@ def _solve_7b6016b9(a, color1=0, color2=3, color3=2):
 
     a[a == color1] = color3
     return a
+
+
+def _outside_mask(a, wall):
+    # Everything reachable from outside the grid; the wall colour blocks the way.
+    # Pad first, then one flood fill from the corner walks the whole outside.
+    padded = np.pad(a, 1, constant_values=-1)
+    h, w = padded.shape
+
+    def is_valid(r, c):
+        return 0 <= r < h and 0 <= c < w and padded[r, c] != wall
+
+    outside = np.zeros(padded.shape, dtype=bool)
+    for r, c in _flood_fill((0, 0), set(), is_valid):
+        outside[r, c] = True
+
+    return outside[1:-1, 1:-1]
+
+
+def _grow(mask, diagonal=False):
+    # Grow the mask by one cell in every direction.
+    # Trick hehe from _mark_blocks, pad first, then no check about bounds.
+    padded = np.pad(mask, 1)
+    grown = padded.copy()
+
+    for r, c in np.argwhere(padded):
+        if diagonal:
+            grown[r - 1 : r + 2, c - 1 : c + 2] = True
+        else:
+            grown[r - 1, c], grown[r + 1, c] = True, True
+            grown[r, c - 1], grown[r, c + 1] = True, True
+
+    return grown[1:-1, 1:-1]
+
+
+def _to_mask(cells, shape):
+    # The cell list of a block from _find_touching_blocks as a mask.
+    mask = np.zeros(shape, dtype=bool)
+    for r, c in cells:
+        mask[r, c] = True
+    return mask
+
+
+def _rooms(mask):
+    # Split a mask into its touching groups of cells.
+    h, w = mask.shape
+    seen = set()
+    rooms = []
+
+    def is_valid(r, c):
+        return 0 <= r < h and 0 <= c < w and mask[r, c]
+
+    for r, c in np.argwhere(mask):
+        if (r, c) not in seen:
+            rooms.append(_flood_fill((r, c), seen, is_valid))
+
+    return rooms
+
+
+def _remove_lone_pixels(a, color1=0):
+    # A pixel that touches no cell of its own colour is just noise.
+    out = a.copy()
+    for _, cells in _find_touching_blocks(a):
+        if len(cells) == 1:
+            r, c = cells[0]
+            out[r, c] = color1
+    return out
+
+
+def _solve_4b6b68e5(a, color1=0):
+    # solves 4b6b68e5
+    out = a.copy()
+
+    for wall in np.unique(a):
+        if wall == color1:
+            continue
+
+        # Everything the outside flood cannot reach is boxed in by this colour.
+        outside = _outside_mask(a, wall)
+        inside = ~outside
+
+        # This colour boxes nothing in, move on.
+        if not np.any(inside & (a != wall)):
+            continue
+
+        # Walls sitting on the grid border touch the outside too.
+        near_outside = _grow(outside)
+        near_outside[[0, -1], :] = True
+        near_outside[:, [0, -1]] = True
+
+        # A wall that reaches the outside is a real box and stays whole (even
+        # its double-thick cells). A wall blob trapped inside is just noise.
+        for color, cells in _find_touching_blocks(a):
+            block = _to_mask(cells, a.shape)
+            if color == wall and np.any(block & near_outside):
+                inside &= ~block
+
+        # Paint every room with the most common colour of the noise in it.
+        for room in _rooms(inside):
+            rows, cols = np.array(room).T
+            noise = a[rows, cols]
+            noise = noise[(noise != color1) & (noise != wall)]
+            if noise.size == 0:
+                continue
+
+            colors, counts = np.unique(noise, return_counts=True)
+            out[rows, cols] = colors[np.argmax(counts)]
+
+    return _remove_lone_pixels(out, color1)
 
 
 def _candidates():
@@ -1118,7 +1207,8 @@ def _candidates():
         _solve_f8a8fe49,
         _solve_18419cfa,
         _solve_2546ccf6,
-        _solve_67c52801
+        _solve_67c52801,
+        _solve_4b6b68e5,
     ]
 
 
@@ -1142,8 +1232,7 @@ def _find_matching_transform(train, candidates):
             except Exception:
                 pass
 
-
-    # If this also fails, try to do a rotation of mirror, transpose, rotation etc. 
+    # If this also fails, try to do a rotation of mirror, transpose, rotation etc.
     for main_transform in candidates:
         n_parameters = len(inspect.signature(main_transform).parameters)
         if n_parameters not in (2, 3, 4, 5):
@@ -1151,7 +1240,13 @@ def _find_matching_transform(train, candidates):
         for color_transform in _color_variants(main_transform, n_parameters - 1):
             try:
                 # Ugly, rewrrite.
-                for transform in [_rotate_90_left, _rotate_180, _transpose, _mirror_up_down, _mirror_left_right]:
+                for transform in [
+                    _rotate_90_left,
+                    _rotate_180,
+                    _transpose,
+                    _mirror_up_down,
+                    _mirror_left_right,
+                ]:
                     pass_ = True
                     for inp, out in train:
                         transformed = color_transform(inp)
