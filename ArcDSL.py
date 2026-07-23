@@ -832,10 +832,10 @@ def _solve_bcb3040b(a, color1=3):
     return out
 
 
-def _connect_stars(a, color1=1):
+def _connect_stars(a, color1=1, color2=0):
     # solves 60a26a3e
     out = a.copy()
-    color_star = np.unique(a[a != 0])[0]
+    color_star = np.unique(a[a != color2])[0]
 
     star_filter = np.array(
         [
@@ -878,7 +878,7 @@ def _connect_stars(a, color1=1):
                             count[color == color_star] > 2
                         ):  # More than 2 red -> a star blocks ray
                             continue
-                        elif count[color == 0] == 0:  # No black, no place for ray
+                        elif count[color == color2] == 0:  # No black, no place for ray
                             continue
 
                         else:
@@ -905,6 +905,8 @@ def _solve_f35d900a(a):  # color1=0, color2=5):
                 if dr == 0 and dc == 0:
                     continue
                 out[r + dr, c + dc] = correct_color
+
+
     # Dots now have to be connected to each other
     # Then, make them walk towards each other, one side at a time.
     # If they overlap, stop.
@@ -938,15 +940,19 @@ def _solve_f8a8fe49(a, color1=0):
     non_bg_cells = np.argwhere(a != color1)
     r0, r1 = non_bg_cells[:, 0].min(), non_bg_cells[:, 0].max()
     c0, c1 = non_bg_cells[:, 1].min(), non_bg_cells[:, 1].max()
-    mid_line = (r0 + r1) // 2
 
     # The box is horizontal when its top edge is one solid bar, else its vertical
     horizontal = np.all(a[r0, c0 : c1 + 1] != color1)
     rotated = False
-    if not horizontal:
+    if horizontal:
         a = np.rot90(a)
+        out = np.rot90(out)
+        non_bg_cells = np.argwhere(a != color1)
+        r0, r1 = non_bg_cells[:, 0].min(), non_bg_cells[:, 0].max()
+        c0, c1 = non_bg_cells[:, 1].min(), non_bg_cells[:, 1].max()
         rotated = True
-    
+    mid_line = (c0 + c1) // 2
+
     # Fill the box with color the mirror th eother side.
     for r, c in np.argwhere(a != color1):
         if not (r0 < r < r1 and c0 < c < c1):
