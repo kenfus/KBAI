@@ -518,14 +518,6 @@ def _transpose(a):
     return a.T.copy()
 
 
-def _mirror_up_down(a):
-    return np.flipud(a)
-
-
-def _mirror_left_right(a):
-    return np.fliplr(a)
-
-
 def _mirror_bottom_half(a):
     # f25ffba3
     bottom = a[a.shape[0] // 2 :]
@@ -768,24 +760,16 @@ def _d_solve_992798f6(a, color1=2, color2=1, color3=3):
 def _d_solve_d931c21c(a, color1=1, color2=3, color3=2):
     # solves d931c21c
     # Closed shapes get a green lining inside and a red halo outside
-    # open shapes just stay like they are
     out = a.copy()
 
-    # No wall color anywhere, nothing to do, keeps the color sweep fast
-    if np.all(a != color1):
-        return out
-
-    # Everything the flood from the border cant reach is inside a closed shape
     inside = ~_outside_mask(a, color1) & (a != color1)
 
-    # Only walls of closed shapes count, open ones dont enclose anything
     walls = np.zeros(a.shape, dtype=bool)
     for color, cells in _find_touching_blocks(a):
         block = _to_mask(cells, a.shape)
         if color == color1 and np.any(_grow(block) & inside):
             walls |= block
 
-    # Paint the empty cells next to a wall, diagonals too
     near_wall = _grow(walls, diagonal=True) & (a != color1)
     out[near_wall & inside] = color2
     out[near_wall & ~inside] = color3
@@ -906,7 +890,6 @@ def _solve_f35d900a(a):  # color1=0, color2=5):
                     continue
                 out[r + dr, c + dc] = correct_color
 
-
     # Dots now have to be connected to each other
     # Then, make them walk towards each other, one side at a time.
     # If they overlap, stop.
@@ -1013,24 +996,20 @@ def _solve_67c52801(a, color1=0):
 def _solve_18419cfa(a, color1=0, color2=8, color3=2):
     # solves 18419cfa
     out = a.copy()
-    # Every 8-frame hides a half-drawn 2-shape. Grab each frame, look at the
-    # little shape sitting inside it, and mirror it across the frame center
-    # sideways if it hangs horizonal, up down if vertical
+    # Mirror the small shape inside each frame.
     for color, cells in _find_touching_blocks(a):
         if color != color2:
             continue
         r0, r1, c0, c1 = _box(cells)
         block = out[r0 : r1 + 1, c0 : c1 + 1].copy()
 
-        # Where does the shape si,t, verizal or horizotal
         shape = np.argwhere(block == color3)
         if shape.size == 0:
             continue
         rows = shape[:, 0]
         hangs_up_down = rows.min() + rows.max() != block.shape[0] - 1
 
-        # Always mirror left/right. For an up/down shape, rot90 it sideways first,
-        # mirror, then rot90 back.
+        # Turn vertical frames sideways so the same mirror works for both.
         work = np.rot90(block) if hangs_up_down else block
         work[np.fliplr(work == color3)] = color3
         block = np.rot90(work, -1) if hangs_up_down else work
@@ -1040,7 +1019,6 @@ def _solve_18419cfa(a, color1=0, color2=8, color3=2):
 
 
 def _bands(length, walls):
-    # Split 0..length-1 into the runs of indices that are NOT wall lines.
     bands = []
     start = None
     for i in range(length):
@@ -1060,60 +1038,42 @@ def _solve_2546ccf6(a, color1=0):
     out = a.copy()
     h, w = a.shape
 
-    # Find the wall colour: scan rows until one is a single colour all the way across.
-    wall = color1
-    for r in range(h):
-        if np.all(a[r] == a[r, 0]) and a[r, 0] != color1:
-            wall = a[r, 0]
-            break
+    solid_rows = np.all(a == a[:, :1], axis=1)
+    wall_row = np.flatnonzero(solid_rows & (a[:, 0] != color1))[0]
+    wall = a[wall_row, 0]
 
-    # The wall lines are the full rows / full columns of that colour; the panels
-    # are the rectangles in between.
-    wall_rows = [r for r in range(h) if np.all(a[r] == wall)]
-    wall_cols = [c for c in range(w) if np.all(a[:, c] == wall)]
+    wall_rows = np.flatnonzero(np.all(a == wall, axis=1))
+    wall_cols = np.flatnonzero(np.all(a == wall, axis=0))
     row_bands = _bands(h, wall_rows)
     col_bands = _bands(w, wall_cols)
 
-    # The shape colour inside a panel, or None when the panel is empty.
-    def panel_color(r0, r1, c0, c1):
-        for r in range(r0, r1 + 1):
-            for c in range(c0, c1 + 1):
-                if a[r, c] != color1 and a[r, c] != wall:
-                    return a[r, c]
-        return None
-
-    # Every empty panel that is the missing corner of a 2x2 block has two
-    # same-coloured neighbours meeting at that corner. Copy the horizontal
-    # neighbour in, mirrored left/right.
+    panel_colors = np.full((len(row_bands), len(col_bands)), color1)
     for i, (r0, r1) in enumerate(row_bands):
         for j, (c0, c1) in enumerate(col_bands):
-            if panel_color(r0, r1, c0, c1) is not None:
+            panel = a[r0 : r1 + 1, c0 : c1 + 1]
+            colors = np.unique(panel[(panel != color1) & (panel != wall)])
+            if colors.size:
+                panel_colors[i, j] = colors[0]
+
+    # Fill a missing corner by mirroring the shape beside it.
+    for i, (r0, r1) in enumerate(row_bands):
+        for j, (c0, c1) in enumerate(col_bands):
+            if panel_colors[i, j] != color1:
                 continue
 
-            up = panel_color(*row_bands[i - 1], c0, c1) if i > 0 else None
-            down = (
-                panel_color(*row_bands[i + 1], c0, c1)
-                if i < len(row_bands) - 1
-                else None
-            )
-            left = panel_color(r0, r1, *col_bands[j - 1]) if j > 0 else None
-            right = (
-                panel_color(r0, r1, *col_bands[j + 1])
-                if j < len(col_bands) - 1
-                else None
-            )
+            up = panel_colors[i - 1, j] if i > 0 else color1
+            down = panel_colors[i + 1, j] if i + 1 < len(row_bands) else color1
+            left = panel_colors[i, j - 1] if j > 0 else color1
+            right = panel_colors[i, j + 1] if j + 1 < len(col_bands) else color1
 
-            if left is not None and up == left:
-                sc0, sc1 = col_bands[j - 1]
-            elif left is not None and down == left:
-                sc0, sc1 = col_bands[j - 1]
-            elif right is not None and up == right:
-                sc0, sc1 = col_bands[j + 1]
-            elif right is not None and down == right:
-                sc0, sc1 = col_bands[j + 1]
+            if left != color1 and left in (up, down):
+                source = col_bands[j - 1]
+            elif right != color1 and right in (up, down):
+                source = col_bands[j + 1]
             else:
                 continue
 
+            sc0, sc1 = source
             out[r0 : r1 + 1, c0 : c1 + 1] = np.fliplr(a[r0 : r1 + 1, sc0 : sc1 + 1])
 
     return out
@@ -1121,8 +1081,7 @@ def _solve_2546ccf6(a, color1=0):
 
 def _solve_7b6016b9(a, color1=0, color2=3, color3=2):
     # solves 7b6016b9
-    # A straight-line raycast from each side misses rooms that only open up
-    # around a corner, so instead flood-fill (4-connected) from every
+    # Mark background regions reachable from the border red; enclosed regions green.
 
     a = a.copy()
     h, w = a.shape
@@ -1330,27 +1289,6 @@ def _find_matching_transform(train, candidates):
         for color_transform in _color_variants(transform, n_parameters - 1):
             if _transform_matches(color_transform, train):
                 return color_transform
-
-    # If this also fails, try to do a rotation of mirror, transpose, rotation etc.
-    for main_transform in candidates:
-        n_parameters = len(inspect.signature(main_transform).parameters)
-        if n_parameters not in (2, 3, 4, 5):
-            continue
-        for color_transform in _color_variants(main_transform, n_parameters - 1):
-            for transform in [
-                _rotate_90_left,
-                _rotate_180,
-                _transpose,
-                _mirror_up_down,
-                _mirror_left_right,
-            ]:
-
-                def both(a, first=color_transform, second=transform):
-                    a = first(a)
-                    return second(a)
-
-                if _transform_matches(both, train):
-                    return both
 
     return None
 
